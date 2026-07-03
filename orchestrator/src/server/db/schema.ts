@@ -69,7 +69,9 @@ export const tenantMemberships = sqliteTable(
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
-    role: text("role", { enum: ["owner", "member"] })
+    role: text("role", {
+      enum: ["owner", "member", "admin", "worker", "client"],
+    })
       .notNull()
       .default("owner"),
     createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
@@ -81,6 +83,74 @@ export const tenantMemberships = sqliteTable(
       table.tenantId,
     ),
     tenantIndex: index("idx_tenant_memberships_tenant_id").on(table.tenantId),
+  }),
+);
+
+export const clients = sqliteTable(
+  "clients",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    notes: text("notes"),
+    status: text("status", {
+      enum: ["active", "inactive", "archived"],
+    })
+      .notNull()
+      .default("active"),
+    resumePdfPath: text("resume_pdf_path"),
+    resumeText: text("resume_text"),
+    searchTerms: text("search_terms").notNull().default("[]"),
+    workplaceTypes: text("workplace_types").notNull().default("[]"),
+    searchCities: text("search_cities").notNull().default("[]"),
+    enableTailoring: integer("enable_tailoring", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (table) => ({
+    tenantEmailUnique: uniqueIndex("idx_clients_tenant_email_unique").on(
+      table.tenantId,
+      table.email,
+    ),
+  }),
+);
+
+export const workerClientAssignments = sqliteTable(
+  "worker_client_assignments",
+  {
+    id: text("id").primaryKey(),
+    workerId: text("worker_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["active", "inactive"],
+    })
+      .notNull()
+      .default("active"),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (table) => ({
+    workerClientUnique: uniqueIndex(
+      "idx_worker_client_assignments_worker_client_unique",
+    ).on(table.workerId, table.clientId),
+    tenantIndex: index("idx_worker_client_assignments_tenant").on(
+      table.tenantId,
+    ),
   }),
 );
 
@@ -168,6 +238,9 @@ export const jobs = sqliteTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, {
       onDelete: "cascade",
+    }),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "set null",
     }),
 
     // From crawler
@@ -274,6 +347,7 @@ export const jobs = sqliteTable(
       table.tenantId,
       table.discoveredAt,
     ),
+    clientIdIndex: index("idx_jobs_client_id").on(table.clientId),
   }),
 );
 
@@ -372,6 +446,9 @@ export const pipelineRuns = sqliteTable("pipeline_runs", {
     .references(() => tenants.id, { onDelete: "cascade" }),
   userId: text("user_id").references(() => users.id, {
     onDelete: "cascade",
+  }),
+  clientId: text("client_id").references(() => clients.id, {
+    onDelete: "set null",
   }),
   startedAt: text("started_at").notNull().default(sql`(datetime('now'))`),
   completedAt: text("completed_at"),
@@ -1107,3 +1184,8 @@ export type TracerLinkRow = typeof tracerLinks.$inferSelect;
 export type NewTracerLinkRow = typeof tracerLinks.$inferInsert;
 export type TracerClickEventRow = typeof tracerClickEvents.$inferSelect;
 export type NewTracerClickEventRow = typeof tracerClickEvents.$inferInsert;
+export type ClientRow = typeof clients.$inferSelect;
+export type NewClientRow = typeof clients.$inferInsert;
+export type WorkerClientAssignmentRow = typeof workerClientAssignments.$inferSelect;
+export type NewWorkerClientAssignmentRow =
+  typeof workerClientAssignments.$inferInsert;

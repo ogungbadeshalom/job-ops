@@ -19,6 +19,7 @@ export type AuthUser = {
   isDisabled: boolean;
   tenantId: string;
   tenantName: string;
+  role: string;
 };
 
 export type PublicUser = {
@@ -88,6 +89,7 @@ export async function getUserForLogin(
       isDisabled: users.isDisabled,
       tenantId: tenantMemberships.tenantId,
       tenantName: tenants.name,
+      role: tenantMemberships.role,
     })
     .from(users)
     .innerJoin(tenantMemberships, eq(tenantMemberships.userId, users.id))

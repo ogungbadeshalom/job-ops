@@ -122,6 +122,7 @@ authRouter.post(
       tenantId: user.workspaceId,
       username: user.username,
       isSystemAdmin: user.isSystemAdmin,
+      role: "member",
     });
 
     ok(res, { token, expiresIn, user }, 201);
@@ -168,6 +169,7 @@ authRouter.post(
         tenantId: user.tenantId,
         username: user.username,
         isSystemAdmin: user.isSystemAdmin,
+        role: user.role,
       }));
     } catch (error) {
       fail(
@@ -246,6 +248,7 @@ authRouter.post(
       tenantId: user.workspaceId,
       username: user.username,
       isSystemAdmin: user.isSystemAdmin,
+      role: "owner",
     });
 
     ok(res, { token, expiresIn, user }, 201);
@@ -270,6 +273,7 @@ authRouter.get(
     const installState = await getOrCreateAnalyticsInstallState();
     ok(res, {
       user,
+      role: payload.role,
       analyticsDistinctId: installState.distinctId,
     });
   }),

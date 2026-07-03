@@ -204,6 +204,77 @@ export async function getJobListItems(
   });
 }
 
+export async function getJobListItemsForClient(
+  clientId: string,
+  statuses?: JobStatus[],
+): Promise<JobListItemWithPdfFreshnessInput[]> {
+  const selection = {
+    id: jobs.id,
+    source: jobs.source,
+    sourceJobId: jobs.sourceJobId,
+    title: jobs.title,
+    employer: jobs.employer,
+    jobUrl: jobs.jobUrl,
+    applicationLink: jobs.applicationLink,
+    datePosted: jobs.datePosted,
+    deadline: jobs.deadline,
+    salary: jobs.salary,
+    location: jobs.location,
+    status: jobs.status,
+    outcome: jobs.outcome,
+    closedAt: jobs.closedAt,
+    suitabilityScore: jobs.suitabilityScore,
+    sponsorMatchScore: jobs.sponsorMatchScore,
+    pdfPath: jobs.pdfPath,
+    pdfSource: jobs.pdfSource,
+    pdfRegenerating: jobs.pdfRegenerating,
+    pdfFingerprint: jobs.pdfFingerprint,
+    tailoredSummary: jobs.tailoredSummary,
+    tailoredHeadline: jobs.tailoredHeadline,
+    tailoredSkills: jobs.tailoredSkills,
+    selectedProjectIds: jobs.selectedProjectIds,
+    jobDescription: jobs.jobDescription,
+    jobBrief: jobs.jobBrief,
+    tracerLinksEnabled: jobs.tracerLinksEnabled,
+    jobType: jobs.jobType,
+    jobFunction: jobs.jobFunction,
+    salaryMinAmount: jobs.salaryMinAmount,
+    salaryMaxAmount: jobs.salaryMaxAmount,
+    salaryCurrency: jobs.salaryCurrency,
+    discoveredAt: jobs.discoveredAt,
+    readyAt: jobs.readyAt,
+    appliedAt: jobs.appliedAt,
+    updatedAt: jobs.updatedAt,
+  } as const;
+
+  const filters = [jobsScopeFilter(), eq(jobs.clientId, clientId)];
+  if (statuses && statuses.length > 0) {
+    filters.push(inArray(jobs.status, statuses));
+  }
+
+  const rows = await db
+    .select(selection)
+    .from(jobs)
+    .where(and(...filters))
+    .orderBy(desc(jobs.discoveredAt));
+
+  return rows.map((row) => ({
+    ...row,
+    source: row.source as JobListItem["source"],
+    status: row.status as JobStatus,
+    pdfSource: row.pdfSource as JobPdfSource | null,
+    pdfRegenerating: row.pdfRegenerating ?? false,
+    pdfFreshness: row.pdfRegenerating
+      ? "regenerating"
+      : row.pdfSource === "uploaded"
+        ? "uploaded"
+        : row.pdfPath
+          ? "stale"
+          : ("missing" as JobPdfFreshness),
+    tracerLinksEnabled: row.tracerLinksEnabled ?? false,
+  }));
+}
+
 export async function getAppliedDuplicateMatchCandidates(): Promise<
   AppliedDuplicateMatchCandidate[]
 > {
@@ -476,6 +547,7 @@ async function insertJob(input: CreateJobInput): Promise<Job> {
     id,
     tenantId: scope.tenantId,
     userId: scope.userId,
+    clientId: input.clientId ?? null,
     source: input.source,
     sourceJobId: input.sourceJobId ?? null,
     jobUrlDirect: input.jobUrlDirect ?? null,

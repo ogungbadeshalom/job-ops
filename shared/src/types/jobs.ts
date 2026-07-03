@@ -300,6 +300,7 @@ export interface CreateJobInput {
   degreeRequired?: string;
   starting?: string;
   jobDescription?: string;
+  clientId?: string | null;
 
   // JobSpy fields (optional)
   sourceJobId?: string;

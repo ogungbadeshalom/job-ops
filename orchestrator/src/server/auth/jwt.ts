@@ -100,6 +100,7 @@ export async function signToken(args: {
   tenantId: string;
   username: string;
   isSystemAdmin: boolean;
+  role: string;
 }): Promise<{
   token: string;
   expiresIn: number;
@@ -124,6 +125,7 @@ export async function signToken(args: {
       tenantId: args.tenantId,
       username: args.username,
       isSystemAdmin: args.isSystemAdmin,
+      role: args.role,
     },
     secret,
     {
@@ -144,6 +146,7 @@ export async function verifyToken(token: string): Promise<{
   tenantId: string;
   username: string;
   isSystemAdmin: boolean;
+  role: string;
 }> {
   const secret = await getJwtSecret();
   const payload = jwt.verify(token, secret, {
@@ -182,6 +185,7 @@ export async function verifyToken(token: string): Promise<{
     tenantId: payload.tenantId,
     username: payload.username,
     isSystemAdmin: payload.isSystemAdmin === true,
+    role: typeof payload.role === "string" ? payload.role : "member",
   };
 }
 

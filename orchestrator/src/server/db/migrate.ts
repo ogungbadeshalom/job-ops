@@ -1636,6 +1636,72 @@ function rebuildPostApplicationPrivateTables(): void {
   }
 }
 
+function ensureAgencyTables(): void {
+  if (!tableExists("clients")) {
+    sqlite.exec(`
+      CREATE TABLE clients (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'tenant_default',
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive', 'archived')),
+        resume_pdf_path TEXT,
+        resume_text TEXT,
+        search_terms TEXT NOT NULL DEFAULT '[]',
+        workplace_types TEXT NOT NULL DEFAULT '[]',
+        search_cities TEXT NOT NULL DEFAULT '[]',
+        enable_tailoring INTEGER NOT NULL DEFAULT 1,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    sqlite.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_tenant_email_unique ON clients(tenant_id, email)",
+    );
+  }
+
+  if (!tableExists("worker_client_assignments")) {
+    sqlite.exec(`
+      CREATE TABLE worker_client_assignments (
+        id TEXT PRIMARY KEY,
+        worker_id TEXT NOT NULL,
+        client_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL DEFAULT 'tenant_default',
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (worker_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      )
+    `);
+    sqlite.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_worker_client_assignments_worker_client_unique ON worker_client_assignments(worker_id, client_id)",
+    );
+  }
+
+  if (
+    tableExists("jobs") &&
+    !tableHasColumn("jobs", "client_id")
+  ) {
+    sqlite.exec("ALTER TABLE jobs ADD COLUMN client_id TEXT REFERENCES clients(id) ON DELETE SET NULL");
+    sqlite.exec("CREATE INDEX IF NOT EXISTS idx_jobs_client_id ON jobs(client_id)");
+  }
+
+  if (
+    tableExists("pipeline_runs") &&
+    !tableHasColumn("pipeline_runs", "client_id")
+  ) {
+    sqlite.exec(
+      "ALTER TABLE pipeline_runs ADD COLUMN client_id TEXT REFERENCES clients(id) ON DELETE SET NULL",
+    );
+  }
+}
+
 function seedLegacyOwnerFromBasicAuth(): void {
   const existing = sqlite
     .prepare("SELECT count(*) AS count FROM users")
@@ -1680,6 +1746,7 @@ function seedLegacyOwnerFromBasicAuth(): void {
 console.log("🔐 Applying tenancy compatibility migrations...");
 ensureTenantColumns();
 seedLegacyOwnerFromBasicAuth();
+ensureAgencyTables();
 ensurePrivateUserColumns();
 rebuildPostApplicationPrivateTables();
 rebuildSettingsTable();
