@@ -137,4 +137,13 @@ export const queryKeys = {
     all: ["backups"] as const,
     list: () => [...queryKeys.backups.all, "list"] as const,
   },
+  agency: {
+    all: ["agency"] as const,
+    clients: () => [...queryKeys.agency.all, "clients"] as const,
+    client: (id: string) => [...queryKeys.agency.all, "client", id] as const,
+    clientStats: (id: string) =>
+      [...queryKeys.agency.all, "client-stats", id] as const,
+    clientJobs: (clientId: string) =>
+      [...queryKeys.agency.all, "client-jobs", clientId] as const,
+  },
 } as const;

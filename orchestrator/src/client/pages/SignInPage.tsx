@@ -1,6 +1,7 @@
 import {
   getAppStatus,
   getAuthBootstrapStatus,
+  getCurrentAuthContext,
   hasAuthenticatedSession,
   restoreAuthSessionFromLegacyCredentials,
   signInWithCredentials,
@@ -84,7 +85,16 @@ export function SignInPage() {
         const restored = await restoreAuthSessionFromLegacyCredentials();
         if (cancelled) return;
         if (restored || hasAuthenticatedSession()) {
-          navigate(nextPath, { replace: true });
+          let target = nextPath;
+          try {
+            const context = await getCurrentAuthContext();
+            if (context.role === "client") {
+              target = "/my-jobs";
+            }
+          } catch {
+            // Fall back to default nextPath if auth context fetch fails
+          }
+          navigate(target, { replace: true });
           return;
         }
       } catch (error) {
@@ -143,7 +153,17 @@ export function SignInPage() {
           }),
         );
       }
-      navigate(nextPath, { replace: true });
+
+      let target = nextPath;
+      try {
+        const context = await getCurrentAuthContext();
+        if (context.role === "client") {
+          target = "/my-jobs";
+        }
+      } catch {
+        // Fall back to default nextPath if auth context fetch fails
+      }
+      navigate(target, { replace: true });
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unable to sign in",

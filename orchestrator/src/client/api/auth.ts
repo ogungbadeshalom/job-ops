@@ -45,6 +45,7 @@ export type AuthBootstrapStatus = {
 
 export type CurrentAuthContext = {
   user: AuthUser;
+  role: string;
   analyticsDistinctId: string | null;
 };
 
@@ -124,10 +125,12 @@ export async function signupWithCredentials(input: {
 export async function getCurrentAuthContext(): Promise<CurrentAuthContext> {
   const result = await fetchApi<{
     user: AuthUser;
+    role: string;
     analyticsDistinctId?: string | null;
   }>("/auth/me");
   return {
     user: result.user,
+    role: result.role,
     analyticsDistinctId: result.analyticsDistinctId ?? null,
   };
 }

@@ -19,6 +19,8 @@ import { OnboardingGate } from "./components/OnboardingGate";
 import { useAnalyticsIdentity } from "./hooks/useAnalyticsIdentity";
 import { useDemoInfo } from "./hooks/useDemoInfo";
 import { setAuthNavigator } from "./lib/auth-navigation";
+import { MyJobDetailPage } from "./pages/client/MyJobDetailPage";
+import { MyJobsPage } from "./pages/client/MyJobsPage";
 import { DesignResumePage } from "./pages/DesignResumePage";
 import { GmailOauthCallbackPage } from "./pages/GmailOauthCallbackPage";
 import { HomePage } from "./pages/HomePage";
@@ -33,6 +35,12 @@ import { TracerLinksPage } from "./pages/TracerLinksPage";
 import { TrackingInboxPage } from "./pages/TrackingInboxPage";
 import { VisaSponsorsPage } from "./pages/VisaSponsorsPage";
 import { WatchlistPage } from "./pages/WatchlistPage";
+import { WorkerClientsPage } from "./pages/agency/WorkerClientsPage";
+import { WorkerClientDashboardPage } from "./pages/agency/WorkerClientDashboardPage";
+import { AdminClientsPage } from "./pages/admin/AdminClientsPage";
+import { AdminClientEditPage } from "./pages/admin/AdminClientEditPage";
+import { AdminClientNewPage } from "./pages/admin/AdminClientNewPage";
+import { AdminWorkersPage } from "./pages/admin/AdminWorkersPage";
 
 /** Backwards-compatibility redirects: old URL paths -> new URL paths */
 const REDIRECTS: Array<{ from: string; to: string }> = [
@@ -197,6 +205,20 @@ export const App: React.FC = () => {
                 <Route path="/visa-sponsors" element={<VisaSponsorsPage />} />
                 <Route path="/tracking-inbox" element={<TrackingInboxPage />} />
                 <Route path="/watchlist" element={<WatchlistPage />} />
+                <Route
+                  path="/agency/clients"
+                  element={<WorkerClientsPage />}
+                />
+                <Route
+                  path="/agency/clients/:id"
+                  element={<WorkerClientDashboardPage />}
+                />
+                <Route path="/admin/clients" element={<AdminClientsPage />} />
+                <Route path="/admin/clients/new" element={<AdminClientNewPage />} />
+                <Route path="/admin/clients/:id" element={<AdminClientEditPage />} />
+                <Route path="/admin/workers" element={<AdminWorkersPage />} />
+                <Route path="/my-jobs" element={<MyJobsPage />} />
+                <Route path="/my-jobs/:id" element={<MyJobDetailPage />} />
                 <Route path="/jobs/:tab" element={<OrchestratorPage />} />
                 <Route
                   path="/jobs/:tab/:jobId"
