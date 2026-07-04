@@ -1700,6 +1700,31 @@ function ensureAgencyTables(): void {
       "ALTER TABLE pipeline_runs ADD COLUMN client_id TEXT REFERENCES clients(id) ON DELETE SET NULL",
     );
   }
+
+  if (tableExists("tenant_memberships")) {
+    const colInfo = sqlite
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tenant_memberships'")
+      .get() as { sql: string } | undefined;
+    if (colInfo && !colInfo.sql.includes("'worker'") && !colInfo.sql.includes("'admin'")) {
+      sqlite.exec("PRAGMA foreign_keys = OFF");
+      sqlite.exec(`CREATE TABLE tenant_memberships_new (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'owner' CHECK(role IN ('owner','member','admin','worker','client')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      )`);
+      sqlite.exec("INSERT INTO tenant_memberships_new SELECT * FROM tenant_memberships");
+      sqlite.exec("DROP TABLE tenant_memberships");
+      sqlite.exec("ALTER TABLE tenant_memberships_new RENAME TO tenant_memberships");
+      sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_memberships_user_tenant ON tenant_memberships(user_id, tenant_id)");
+      sqlite.exec("CREATE INDEX IF NOT EXISTS idx_tenant_memberships_tenant_id ON tenant_memberships(tenant_id)");
+      sqlite.exec("PRAGMA foreign_keys = ON");
+    }
+  }
 }
 
 function seedLegacyOwnerFromBasicAuth(): void {
