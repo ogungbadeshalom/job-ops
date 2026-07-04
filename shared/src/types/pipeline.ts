@@ -24,6 +24,10 @@ export interface PipelineConfig {
   // sources. Non-empty = include only those source IDs that still belong
   // to the current user; unknown IDs are dropped server-side.
   watchlistSelectedSourceIds?: string[] | null;
+  // Agency client context for worker pipeline runs.
+  // When set, discovered jobs are tagged with this client ID
+  // and the client's search terms override the worker's own terms.
+  clientId?: string | null;
 }
 
 export interface PipelineRunConfigSnapshot {

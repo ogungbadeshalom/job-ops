@@ -436,6 +436,12 @@ export async function discoverJobsStep(args: {
         }
       }
 
+      if (args.mergedConfig.clientId) {
+        for (const job of discoveredJobs) {
+          job.clientId = args.mergedConfig.clientId;
+        }
+      }
+
       if (watchlistSelectedSources.length > 0 && !args.shouldCancel?.()) {
         progressHelpers.startSource(
           "watchlist",

@@ -2,6 +2,7 @@ import * as api from "@client/api";
 import { PageHeader, PageMain, EmptyState } from "@client/components/layout";
 import { showErrorToast } from "@client/lib/error-toast";
 import { queryKeys } from "@client/lib/queryKeys";
+import { subscribeToEventSource } from "@client/lib/sse";
 import type { JobListItem } from "@shared/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,6 +18,7 @@ import {
   UserRoundCheck,
 } from "lucide-react";
 import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import * as agencyApi from "../../api/agency";
+
+interface PipelineProgressLike {
+  step: string;
+  message?: string;
+  jobsDiscovered?: number;
+  jobsProcessed?: number;
+}
 
 const statusTokens: Record<
   string,
@@ -168,6 +177,60 @@ export const WorkerClientDashboardPage: React.FC = () => {
     },
   });
 
+  const [isPipelineRunning, setIsPipelineRunning] = useState(false);
+  const pipelineJobsDiscoveredRef = useRef<number | null>(null);
+
+  const pipelineMutation = useMutation({
+    mutationFn: () => agencyApi.runPipelineForClient(id!),
+    onSuccess: () => {
+      setIsPipelineRunning(true);
+      toast.message("Pipeline started — searching for jobs...");
+    },
+    onError: (err) => {
+      showErrorToast(err, "Failed to start pipeline");
+    },
+  });
+
+  useEffect(() => {
+    const unsubscribe = subscribeToEventSource<PipelineProgressLike>(
+      "/api/pipeline/progress",
+      {
+        onMessage: (payload) => {
+          if (!payload || typeof payload.step !== "string") return;
+
+          if (payload.step === "completed") {
+            setIsPipelineRunning(false);
+            const discovered =
+              typeof payload.jobsDiscovered === "number"
+                ? payload.jobsDiscovered
+                : pipelineJobsDiscoveredRef.current;
+            queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.agency.client(id!),
+            });
+            toast.success(
+              `Pipeline completed — ${discovered ?? "?"} jobs found`,
+            );
+          } else if (
+            payload.step === "failed" ||
+            payload.step === "cancelled"
+          ) {
+            setIsPipelineRunning(false);
+          }
+
+          if (
+            typeof payload.jobsDiscovered === "number" &&
+            payload.jobsDiscovered > 0
+          ) {
+            pipelineJobsDiscoveredRef.current = payload.jobsDiscovered;
+          }
+        },
+      },
+    );
+
+    return unsubscribe;
+  }, [id, queryClient]);
+
   if (!id) {
     return (
       <EmptyState
@@ -280,12 +343,20 @@ export const WorkerClientDashboardPage: React.FC = () => {
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={() =>
-                    toast.info("Pipeline run will be available in a future update.")
-                  }
+                  disabled={isPipelineRunning || pipelineMutation.isPending}
+                  onClick={() => pipelineMutation.mutate()}
                 >
-                  <Play className="mr-1 h-4 w-4" />
-                  Run Pipeline
+                  {isPipelineRunning || pipelineMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-1 h-4 w-4" />
+                      Run Pipeline
+                    </>
+                  )}
                 </Button>
               </CardHeader>
               <CardContent>

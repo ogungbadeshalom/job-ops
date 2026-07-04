@@ -7,12 +7,16 @@ import {
   getClientById,
   getClientForClientUser,
   getClientJobCount,
+  getClientLoginStatus,
   listClients,
   listClientsForWorker,
+  setClientCreatedBy,
   updateClient,
 } from "@server/repositories/clients";
+import { createPrivateWorkspaceUser } from "@server/repositories/users";
 import { isSystemAdmin } from "@infra/request-context";
 import { getUserId } from "@infra/request-context";
+import { randomBytes } from "node:crypto";
 import type { Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
@@ -80,7 +84,8 @@ clientsRouter.get(
     }
 
     const stats = await getClientJobCount(req.params.id);
-    ok(res, { client, stats });
+    const loginStatus = await getClientLoginStatus(req.params.id);
+    ok(res, { client: { ...client, ...loginStatus }, stats });
   }),
 );
 
@@ -151,6 +156,43 @@ clientsRouter.patch(
       return;
     }
     ok(res, { client });
+  }),
+);
+
+clientsRouter.post(
+  "/:id/create-login",
+  asyncRoute(async (req: Request, res: Response) => {
+    if (!requireAdmin(res)) return;
+
+    const client = await getClientById(req.params.id);
+    if (!client) {
+      fail(res, notFound("Client not found"));
+      return;
+    }
+
+    const loginStatus = await getClientLoginStatus(req.params.id);
+    if (loginStatus.hasLogin) {
+      fail(res, badRequest("Client already has a login"));
+      return;
+    }
+
+    const emailPrefix = client.email.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "") || "client";
+    const suffix = randomBytes(4).toString("hex");
+    const username = `${emailPrefix.toLowerCase()}-${suffix}`;
+    const password = randomBytes(16).toString("hex");
+
+    const user = await createPrivateWorkspaceUser({
+      username,
+      password,
+      displayName: client.name,
+      isSystemAdmin: false,
+      useDefaultTenant: true,
+      role: "client",
+    });
+
+    await setClientCreatedBy(req.params.id, user.id);
+
+    ok(res, { username, password }, 201);
   }),
 );
 

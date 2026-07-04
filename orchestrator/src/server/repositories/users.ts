@@ -148,6 +148,7 @@ export async function createPrivateWorkspaceUser(input: {
   displayName?: string | null;
   isSystemAdmin?: boolean;
   useDefaultTenant?: boolean;
+  role?: "owner" | "member" | "admin" | "worker" | "client";
 }): Promise<PublicUser> {
   const now = new Date().toISOString();
   const username = normalizeUsername(input.username);
@@ -202,7 +203,7 @@ export async function createPrivateWorkspaceUser(input: {
         id: randomUUID(),
         userId,
         tenantId,
-        role: "owner",
+        role: input.role ?? "owner",
         createdAt: now,
         updatedAt: now,
       })

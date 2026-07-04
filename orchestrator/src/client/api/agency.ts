@@ -140,3 +140,22 @@ export async function fetchUsers(): Promise<AuthUser[]> {
   const result = await fetchApi<{ users: AuthUser[] }>("/workspaces/users");
   return result.users;
 }
+
+export async function runPipelineForClient(
+  clientId: string,
+): Promise<{ message: string }> {
+  return fetchApi<{ message: string }>("/pipeline/run", {
+    method: "POST",
+    body: JSON.stringify({ clientId }),
+  });
+}
+
+export async function createClientLogin(
+  clientId: string,
+): Promise<{ username: string; password: string }> {
+  const result = await fetchApi<{ username: string; password: string }>(
+    `/clients/${encodeURIComponent(clientId)}/create-login`,
+    { method: "POST" },
+  );
+  return result;
+}

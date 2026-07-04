@@ -3,7 +3,7 @@ import { getActiveTenantId } from "@server/tenancy/context";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "../db";
 
-const { clients, workerClientAssignments, users } = schema;
+const { clients, tenantMemberships, workerClientAssignments, users } = schema;
 
 export type ClientRow = typeof clients.$inferSelect;
 export type NewClientRow = typeof clients.$inferInsert;
@@ -169,6 +169,42 @@ export async function updateClient(
   return getClientById(id);
 }
 
+export async function getClientLoginStatus(
+  clientId: string,
+): Promise<{ hasLogin: boolean; clientUserId: string | null }> {
+  const tenantId = getActiveTenantId();
+  const client = await getClientById(clientId);
+  if (!client) return { hasLogin: false, clientUserId: null };
+
+  const [membership] = await db
+    .select({ role: tenantMemberships.role })
+    .from(tenantMemberships)
+    .where(
+      and(
+        eq(tenantMemberships.userId, client.createdBy),
+        eq(tenantMemberships.tenantId, tenantId),
+      ),
+    )
+    .limit(1);
+
+  if (membership && membership.role === "client") {
+    return { hasLogin: true, clientUserId: client.createdBy };
+  }
+  return { hasLogin: false, clientUserId: null };
+}
+
+export async function setClientCreatedBy(
+  clientId: string,
+  userId: string,
+): Promise<ClientRow | null> {
+  const tenantId = getActiveTenantId();
+  await db
+    .update(clients)
+    .set({ createdBy: userId, updatedAt: new Date().toISOString() })
+    .where(and(eq(clients.id, clientId), eq(clients.tenantId, tenantId)));
+  return getClientById(clientId);
+}
+
 export async function getClientJobCount(
   clientId: string,
 ): Promise<{ total: number; applied: number; interviewing: number; offer: number }> {
@@ -208,4 +244,38 @@ export async function getClientJobCount(
     interviewing: inProgressRow?.count ?? 0,
     offer: 0,
   };
+}
+
+export async function getClientLoginStatus(
+  clientId: string,
+): Promise<{ hasLogin: boolean; username?: string }> {
+  const tenantId = getActiveTenantId();
+  const client = await getClientById(clientId);
+  if (!client) return { hasLogin: false };
+
+  const [row] = await db
+    .select({ id: users.id, username: users.username })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, client.createdBy),
+        eq(users.isDisabled, false),
+      ),
+    )
+    .limit(1);
+
+  if (!row) return { hasLogin: false };
+
+  return { hasLogin: true, username: row.username };
+}
+
+export async function setClientCreatedBy(
+  clientId: string,
+  userId: string,
+): Promise<void> {
+  const tenantId = getActiveTenantId();
+  await db
+    .update(clients)
+    .set({ createdBy: userId, updatedAt: new Date().toISOString() })
+    .where(and(eq(clients.id, clientId), eq(clients.tenantId, tenantId)));
 }

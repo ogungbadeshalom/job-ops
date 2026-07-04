@@ -27,6 +27,7 @@ import {
   runPipeline,
   subscribeToProgress,
 } from "@server/pipeline/index";
+import { getClientById } from "@server/repositories/clients";
 import * as pipelineRepo from "@server/repositories/pipeline";
 import * as pipelineSearchPresetsRepo from "@server/repositories/pipeline-search-presets";
 import { trackCanonicalActivationEvent } from "@server/services/activation-funnel";
@@ -448,15 +449,62 @@ const runPipelineSchema = z.object({
   // subset. Cross-tenant safety is enforced by re-resolving IDs against
   // the user's saved Watchlist sources inside discoverJobsStep.
   watchlistSelectedSourceIds: z.array(z.string().min(1).max(128)).optional(),
+  // Agency pipeline: when set, fetches the client's search terms and tags
+  // discovered jobs with the client ID. Overrides the worker's own terms.
+  clientId: z.string().optional(),
 });
 
 pipelineRouter.post("/run", async (req: Request, res: Response) => {
   try {
     const config = runPipelineSchema.parse(req.body);
+
+    let resolvedSearchTerms = config.searchTerms;
+    let resolvedWorkplaceTypes = config.workplaceTypes;
+    let resolvedCityLocations = config.cityLocations;
+
+    if (config.clientId) {
+      const client = await getClientById(config.clientId);
+      if (!client) {
+        return fail(res, notFound("Client not found"));
+      }
+
+      let clientSearchTerms: string[] = [];
+      let clientWorkplaceTypes: string[] = [];
+      let clientSearchCities: string[] = [];
+
+      try {
+        clientSearchTerms = JSON.parse(client.searchTerms) as string[];
+      } catch {
+        // ignore malformed JSON
+      }
+      try {
+        clientWorkplaceTypes = JSON.parse(client.workplaceTypes) as string[];
+      } catch {
+        // ignore malformed JSON
+      }
+      try {
+        clientSearchCities = JSON.parse(client.searchCities) as string[];
+      } catch {
+        // ignore malformed JSON
+      }
+
+      if (clientSearchTerms.length > 0) {
+        resolvedSearchTerms = clientSearchTerms;
+      }
+      if (clientWorkplaceTypes.length > 0) {
+        resolvedWorkplaceTypes = clientWorkplaceTypes as Array<
+          "remote" | "hybrid" | "onsite"
+        >;
+      }
+      if (clientSearchCities.length > 0) {
+        resolvedCityLocations = clientSearchCities;
+      }
+    }
+
     const locationIntent = createLocationIntent({
       selectedCountry: config.country,
-      cityLocations: config.cityLocations,
-      workplaceTypes: config.workplaceTypes,
+      cityLocations: resolvedCityLocations ?? config.cityLocations,
+      workplaceTypes: resolvedWorkplaceTypes ?? config.workplaceTypes,
       geoScope: config.searchScope,
       matchStrictness: config.matchStrictness,
     });
@@ -531,7 +579,7 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
     }
 
     const searchTermsState = await ensurePipelineSearchTerms({
-      requestedSearchTerms: config.searchTerms,
+      requestedSearchTerms: resolvedSearchTerms ?? config.searchTerms,
     });
     const pipelineUsage = await reserveHostedUsage({
       action: "pipeline_run",
@@ -547,6 +595,7 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
           scoringInstructions: config.scoringInstructions,
           locationIntent,
           watchlistSelectedSourceIds: config.watchlistSelectedSourceIds,
+          clientId: config.clientId ?? undefined,
         },
         {
           hostedUsageReservationId: pipelineUsage.reservation?.id ?? null,
@@ -563,8 +612,8 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
         top_n: config.topN,
         min_suitability_score: config.minSuitabilityScore,
         country: config.country,
-        has_city_locations: Array.isArray(config.cityLocations)
-          ? config.cityLocations.length > 0
+        has_city_locations: Array.isArray(resolvedCityLocations ?? config.cityLocations)
+          ? (resolvedCityLocations ?? config.cityLocations ?? []).length > 0
           : false,
         search_terms_count: searchTermsState.searchTermsCount,
         search_terms_source: searchTermsState.source,
@@ -574,6 +623,7 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
         )
           ? config.watchlistSelectedSourceIds.length
           : undefined,
+        client_id_provided: Boolean(config.clientId),
       },
       {
         requestOrigin: resolveRequestOrigin(req),

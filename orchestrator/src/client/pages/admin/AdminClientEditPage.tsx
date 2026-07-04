@@ -1,7 +1,8 @@
 import * as api from "@client/api";
+import { createClientLogin } from "@client/api/agency";
 import { PageHeader } from "@client/components/layout";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Save, UserCog, X } from "lucide-react";
+import { ArrowLeft, Key, Save, UserCog, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import { useQueryErrorToast } from "@/client/hooks/useQueryErrorToast";
 import { showErrorToast } from "@/client/lib/error-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -41,6 +43,11 @@ export const AdminClientEditPage: React.FC = () => {
   const [enableTailoring, setEnableTailoring] = useState(true);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [currentAssignmentId, setCurrentAssignmentId] = useState<string | null>(null);
+
+  const [loginCredentials, setLoginCredentials] = useState<{
+    username: string;
+    password: string;
+  } | null>(null);
 
   const { data: client, isLoading, error } = useQuery({
     queryKey: ["clients", id],
@@ -144,6 +151,18 @@ export const AdminClientEditPage: React.FC = () => {
     },
     onError: (error) => {
       showErrorToast(error, "Failed to remove assignment");
+    },
+  });
+
+  const createLoginMutation = useMutation({
+    mutationFn: () => createClientLogin(id!),
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ["clients", id] });
+      setLoginCredentials(data);
+      toast.success("Client login created");
+    },
+    onError: (error) => {
+      showErrorToast(error, "Failed to create client login");
     },
   });
 
@@ -372,6 +391,75 @@ export const AdminClientEditPage: React.FC = () => {
                   No users available.
                 </p>
               )}
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        <div className="space-y-3">
+          <Label className="text-sm font-semibold">Client Login</Label>
+          {loginCredentials ? (
+            <Card className="border-green-500/50 bg-green-50 dark:bg-green-950/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-green-800 dark:text-green-200">
+                  Login Credentials
+                </CardTitle>
+                <CardDescription className="text-xs text-green-700 dark:text-green-300">
+                  Share these with the client. Password will not be shown again.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>
+                  <span className="font-medium">Username:</span>{" "}
+                  <code className="rounded bg-green-200 px-1 dark:bg-green-800">{loginCredentials.username}</code>
+                </div>
+                <div>
+                  <span className="font-medium">Password:</span>{" "}
+                  <code className="rounded bg-green-200 px-1 dark:bg-green-800">{loginCredentials.password}</code>
+                </div>
+              </CardContent>
+            </Card>
+          ) : client.hasLogin ? (
+            <div className="flex items-center justify-between rounded-md border border-border p-3">
+              <div>
+                <span className="text-sm font-medium">Login exists</span>
+                <p className="text-xs text-muted-foreground">
+                  Client can sign in at /sign-in. Regenerate to reset credentials.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!window.confirm("Regenerate client credentials? The old credentials will be invalidated.")) return;
+                  createLoginMutation.mutate();
+                }}
+                disabled={createLoginMutation.isPending}
+              >
+                <Key className="mr-1 h-4 w-4" />
+                {createLoginMutation.isPending ? "Regenerating..." : "Regenerate"}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between rounded-md border border-border p-3">
+              <div>
+                <span className="text-sm font-medium">No login yet</span>
+                <p className="text-xs text-muted-foreground">
+                  Create a login so the client can view their jobs at /my-jobs.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => createLoginMutation.mutate()}
+                disabled={createLoginMutation.isPending}
+              >
+                <Key className="mr-1 h-4 w-4" />
+                {createLoginMutation.isPending ? "Creating..." : "Create Login"}
+              </Button>
             </div>
           )}
         </div>

@@ -39,6 +39,8 @@ export interface Client {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  hasLogin?: boolean;
+  clientUserId?: string | null;
 }
 
 export interface WorkerClientAssignment {
