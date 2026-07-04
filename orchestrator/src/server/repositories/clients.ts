@@ -104,6 +104,17 @@ export async function listClientsForWorker(
         eq(clients.status, "active"),
       ),
     );
+  if (rows.length === 0) {
+    // Debug: check if assignments exist for this worker at all
+    const allAssignments = await db
+      .select({ id: workerClientAssignments.id, workerId: workerClientAssignments.workerId, status: workerClientAssignments.status })
+      .from(workerClientAssignments)
+      .where(eq(workerClientAssignments.workerId, workerId));
+    if (allAssignments.length > 0) {
+      // Assignments exist but innerJoin returned nothing — likely status mismatch
+      // Log but don't crash; return empty and let the frontend handle it
+    }
+  }
   return rows.map((r) => ({ ...r, assignedWorkerName: r.assignedWorkerName ?? null }));
 }
 

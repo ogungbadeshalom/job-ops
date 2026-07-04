@@ -48,7 +48,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isAnalyticsDisabled(): boolean {
+export function isAnalyticsDisabled(): boolean {
   const normalized = process.env.JOBOPS_DISABLE_ANALYTICS?.trim().toLowerCase();
   return normalized ? ANALYTICS_DISABLED_TRUTHY_VALUES.has(normalized) : false;
 }

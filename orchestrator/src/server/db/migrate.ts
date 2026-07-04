@@ -1240,7 +1240,7 @@ for (const migration of migrations) {
     }
 
     console.error("❌ Migration failed:", error);
-    process.exit(1);
+    throw new Error(`Required database migration failed: ${message}`);
   }
 }
 

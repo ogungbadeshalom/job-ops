@@ -17,6 +17,7 @@ import {
   requestContextMiddleware,
 } from "@infra/http";
 import { logger } from "@infra/logger";
+import { isAnalyticsDisabled } from "@infra/product-analytics";
 import { runWithRequestContext } from "@infra/request-context";
 import { sanitizeUnknown } from "@infra/sanitize";
 import { verifyToken } from "@server/auth/jwt";
@@ -62,7 +63,6 @@ const ALLOWED_UMAMI_PROXY_METHODS = new Map<string, string[]>([
   ["/script.js", ["GET", "HEAD"]],
   ["/api/send", ["POST"]],
 ]);
-const ANALYTICS_DISABLED_TRUTHY_VALUES = new Set(["1", "true", "yes", "on"]);
 const UMAMI_SCRIPT_PATTERN =
   /\s*<script\s+defer\s+src="https:\/\/umami\.dakheera47\.com\/script\.js"\s+data-website-id="0dc42ed1-87c3-4ac0-9409-5a9b9588fe66"\s*><\/script>/;
 const OPENPANEL_SCRIPT_PATTERN =
@@ -70,11 +70,6 @@ const OPENPANEL_SCRIPT_PATTERN =
 
 function isStatsRoute(path: string): boolean {
   return path === "/stats" || path.startsWith("/stats/");
-}
-
-function isAnalyticsDisabled(): boolean {
-  const normalized = process.env.JOBOPS_DISABLE_ANALYTICS?.trim().toLowerCase();
-  return normalized ? ANALYTICS_DISABLED_TRUTHY_VALUES.has(normalized) : false;
 }
 
 function renderHtmlWithAnalyticsConfig(html: string): string {

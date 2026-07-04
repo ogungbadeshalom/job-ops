@@ -171,6 +171,23 @@ export async function deleteAssignment(id: string): Promise<boolean> {
   return true;
 }
 
+export async function getAssignedClientIdsForWorker(
+  workerId: string,
+): Promise<string[]> {
+  const tenantId = getActiveTenantId();
+  const rows = await db
+    .select({ clientId: workerClientAssignments.clientId })
+    .from(workerClientAssignments)
+    .where(
+      and(
+        eq(workerClientAssignments.tenantId, tenantId),
+        eq(workerClientAssignments.workerId, workerId),
+        eq(workerClientAssignments.status, "active"),
+      ),
+    );
+  return rows.map((r) => r.clientId);
+}
+
 export async function isWorkerAssignedToClient(
   workerId: string,
   clientId: string,
