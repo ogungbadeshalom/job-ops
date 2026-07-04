@@ -121,7 +121,7 @@ export function getNavLinks(): NavLink[] {
     links.push(...ADMIN_NAV);
   }
 
-  if (role === "worker" || isAdmin) {
+  if (role !== "client") {
     links.push(...AGENCY_NAV);
   }
 
