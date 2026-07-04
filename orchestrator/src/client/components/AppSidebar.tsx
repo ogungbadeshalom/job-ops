@@ -36,6 +36,20 @@ export const AppSidebar: React.FC<{
 
   const navLinks = getNavLinks();
   const hidden = location.pathname === "/sign-in" || location.pathname === "/onboarding" || location.pathname === "/offline";
+
+  const role = (() => {
+    try {
+      const token = localStorage.getItem("jobops.authToken");
+      if (!token) return "no-token";
+      const raw = token.split(".")[1];
+      if (!raw) return "no-payload";
+      const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+      const decoded = JSON.parse(atob(padded));
+      return decoded.role ?? "no-role";
+    } catch { return "error"; }
+  })();
+
   if (hidden) return null;
 
   return (
@@ -54,7 +68,7 @@ export const AppSidebar: React.FC<{
         )}
       >
         <div className="flex h-14 items-center justify-between border-b px-4">
-          <span className="font-semibold text-sm">JobOps</span>
+          <span className="font-semibold text-sm">JobOps <span className="text-muted-foreground text-xs ml-1">({role})</span></span>
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
