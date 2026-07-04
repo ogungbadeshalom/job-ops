@@ -14,8 +14,10 @@ import {
   setClientCreatedBy,
   updateClient,
 } from "@server/repositories/clients";
-import { createPrivateWorkspaceUser } from "@server/repositories/users";
+import { createPrivateWorkspaceUser, deleteUser } from "@server/repositories/users";
+import { revokeAuthSessionsForUser } from "@server/repositories/auth-sessions";
 import { isSystemAdmin } from "@infra/request-context";
+import { isWorkerAssignedToClient } from "@server/repositories/worker-assignments";
 import { getUserId } from "@infra/request-context";
 import { randomBytes } from "node:crypto";
 import type { Request, Response } from "express";
@@ -82,6 +84,14 @@ clientsRouter.get(
     if (!client) {
       fail(res, notFound("Client not found"));
       return;
+    }
+
+    if (!isSystemAdmin() && client.createdBy !== userId) {
+      const assigned = await isWorkerAssignedToClient(userId, req.params.id);
+      if (!assigned) {
+        fail(res, forbidden("You are not assigned to this client"));
+        return;
+      }
     }
 
     const stats = await getClientJobCount(req.params.id);
@@ -186,10 +196,6 @@ clientsRouter.post(
     }
 
     const loginStatus = await getClientLoginStatus(req.params.id);
-    if (loginStatus.hasLogin) {
-      fail(res, badRequest("Client already has a login"));
-      return;
-    }
 
     const emailPrefix = client.email.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "") || "client";
     const suffix = randomBytes(4).toString("hex");
@@ -204,6 +210,11 @@ clientsRouter.post(
       useDefaultTenant: true,
       role: "client",
     });
+
+    if (loginStatus.hasLogin) {
+      await revokeAuthSessionsForUser(loginStatus.clientUserId!);
+      await deleteUser(loginStatus.clientUserId!);
+    }
 
     await setClientCreatedBy(req.params.id, user.id);
 

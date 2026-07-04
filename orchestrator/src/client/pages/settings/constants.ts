@@ -12,6 +12,7 @@ export const ALL_JOB_STATUSES: JobStatus[] = [
   "ready",
   "applied",
   "in_progress",
+  "offer",
   "skipped",
   "expired",
 ];
@@ -23,6 +24,7 @@ export const STATUS_DESCRIPTIONS: Record<JobStatus, string> = {
   ready: "PDF generated, waiting for user to apply",
   applied: "Application sent",
   in_progress: "Application moved beyond applied stage",
+  offer: "Offer received",
   skipped: "User skipped this job",
   expired: "Deadline passed",
 };

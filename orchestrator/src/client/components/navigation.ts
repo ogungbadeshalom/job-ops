@@ -8,6 +8,7 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
+import { getRoleFromToken, isAdminFromToken } from "@client/lib/jwt";
 
 export type NavLink = {
   to: string;
@@ -15,40 +16,6 @@ export type NavLink = {
   icon: typeof Home;
   activePaths?: string[];
 };
-
-function decodePayload(token: string): Record<string, unknown> | null {
-  try {
-    const raw = token.split(".")[1];
-    if (!raw) return null;
-    const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(
-      normalized.length + ((4 - (normalized.length % 4)) % 4),
-      "=",
-    );
-    const decoded = JSON.parse(atob(padded));
-    return decoded && typeof decoded === "object"
-      ? (decoded as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function getRoleFromToken(): string | null {
-  const token = localStorage.getItem("jobops.authToken");
-  if (!token) return null;
-  const decoded = decodePayload(token);
-  if (!decoded) return null;
-  return typeof decoded.role === "string" ? decoded.role : null;
-}
-
-function isAdminFromToken(): boolean {
-  const token = localStorage.getItem("jobops.authToken");
-  if (!token) return false;
-  const decoded = decodePayload(token);
-  if (!decoded) return false;
-  return decoded.isSystemAdmin === true;
-}
 
 const SHARED_NAV: NavLink[] = [
   { to: "/overview", label: "Overview", icon: Home },
@@ -98,6 +65,7 @@ const CLIENT_NAV: NavLink[] = [
     icon: LayoutDashboard,
     activePaths: ["/my-jobs"],
   },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function getNavLinks(): NavLink[] {

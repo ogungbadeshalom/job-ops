@@ -296,6 +296,7 @@ export const jobs = sqliteTable(
         "ready",
         "applied",
         "in_progress",
+        "offer",
         "skipped",
         "expired",
       ],

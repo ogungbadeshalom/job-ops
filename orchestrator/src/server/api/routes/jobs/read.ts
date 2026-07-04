@@ -63,17 +63,18 @@ jobsReadRouter.get("/", async (req: Request, res: Response) => {
     const statusFilter = parsedQuery.data.status;
     const statuses = parseStatusFilter(statusFilter);
     const view = parsedQuery.data.view ?? "list";
+    const clientId = parsedQuery.data.clientId ?? undefined;
 
     const primaryQueryStart = performance.now();
     const pdfFingerprintContext = await resolvePdfFingerprintContext();
     const jobs =
       view === "list"
         ? applyJobsPdfFreshness(
-            await jobsRepo.getJobListItems(statuses),
+            await jobsRepo.getJobListItems(statuses, clientId),
             pdfFingerprintContext,
           ).map(toJobListItem)
         : applyJobsPdfFreshness(
-            await jobsRepo.getAllJobs(statuses),
+            await jobsRepo.getAllJobs(statuses, clientId),
             pdfFingerprintContext,
           );
     primaryQueryMs = performance.now() - primaryQueryStart;
@@ -83,7 +84,7 @@ jobsReadRouter.get("/", async (req: Request, res: Response) => {
     const stats = await jobsRepo.getJobStats();
     statsAggregateMs = performance.now() - statsAggregateStart;
     const revisionAggregateStart = performance.now();
-    const revision = await jobsRepo.getJobsRevision(statuses);
+    const revision = await jobsRepo.getJobsRevision(statuses, clientId);
     revisionAggregateMs = performance.now() - revisionAggregateStart;
 
     const response = {

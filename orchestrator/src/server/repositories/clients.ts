@@ -176,9 +176,20 @@ export async function deleteClient(
   const client = await getClientById(id);
   if (!client) return false;
 
-  await db
-    .delete(clients)
-    .where(and(eq(clients.id, id), eq(clients.tenantId, tenantId)));
+  db.transaction((tx) => {
+    tx.delete(workerClientAssignments)
+      .where(
+        and(
+          eq(workerClientAssignments.clientId, id),
+          eq(workerClientAssignments.tenantId, tenantId),
+        ),
+      )
+      .run();
+    tx.delete(clients)
+      .where(and(eq(clients.id, id), eq(clients.tenantId, tenantId)))
+      .run();
+  });
+
   return true;
 }
 
@@ -250,11 +261,21 @@ export async function getClientJobCount(
         eq(jobs.status, "in_progress"),
       ),
     );
+  const [offerRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(jobs)
+    .where(
+      and(
+        eq(jobs.clientId, clientId),
+        eq(jobs.tenantId, tenantId),
+        eq(jobs.status, "offer"),
+      ),
+    );
 
   return {
     total: totalRow?.count ?? 0,
     applied: appliedRow?.count ?? 0,
     interviewing: inProgressRow?.count ?? 0,
-    offer: 0,
+    offer: offerRow?.count ?? 0,
   };
 }

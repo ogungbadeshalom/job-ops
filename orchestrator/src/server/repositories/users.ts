@@ -332,6 +332,13 @@ export async function createInitialSystemAdmin(input: {
   return user;
 }
 
+export async function deleteUser(id: string): Promise<boolean> {
+  const existing = await getUserById(id);
+  if (!existing) return false;
+  await db.delete(users).where(eq(users.id, id));
+  return true;
+}
+
 export async function setUserDisabled(
   id: string,
   isDisabled: boolean,

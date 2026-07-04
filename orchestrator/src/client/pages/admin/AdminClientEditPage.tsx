@@ -219,13 +219,6 @@ export const AdminClientEditPage: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-6">
-      <div className="mb-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/admin/clients")}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Clients
-        </Button>
-      </div>
-
       <PageHeader
         icon={UserCog}
         title={client.name}
@@ -238,6 +231,12 @@ export const AdminClientEditPage: React.FC = () => {
           >
             {client.status}
           </Badge>
+        }
+        actions={
+          <Button variant="ghost" size="sm" onClick={() => navigate("/admin/clients")}>
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back
+          </Button>
         }
       />
 

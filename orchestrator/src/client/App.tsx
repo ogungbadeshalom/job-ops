@@ -19,6 +19,7 @@ import { AuthGuard } from "./components/AuthGuard";
 import { AppSidebar } from "./components/AppSidebar";
 import { OnboardingGate } from "./components/OnboardingGate";
 import { SidebarProvider, useSidebar } from "./components/SidebarContext";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 
 const AppSidebarWrapper: React.FC = () => {
   const { open, setOpen } = useSidebar();
@@ -180,61 +181,63 @@ export const App: React.FC = () => {
             unmountOnExit
           >
             <div ref={nodeRef}>
-              <Routes location={location}>
-                {/* Backwards-compatibility redirects */}
-                {REDIRECTS.map(({ from, to }) => (
-                  <Route
-                    key={from}
-                    path={from}
-                    element={<Navigate to={to} replace />}
-                  />
-                ))}
+              <AppErrorBoundary>
+                <Routes location={location}>
+                  {/* Backwards-compatibility redirects */}
+                  {REDIRECTS.map(({ from, to }) => (
+                    <Route
+                      key={from}
+                      path={from}
+                      element={<Navigate to={to} replace />}
+                    />
+                  ))}
 
-                {/* Application routes */}
-                <Route path="/overview" element={<HomePage />} />
-                <Route
-                  path="/oauth/gmail/callback"
-                  element={<GmailOauthCallbackPage />}
-                />
-                <Route path="/job/:id" element={<JobPage />} />
-                <Route path="/job/:id/:view" element={<JobPage />} />
-                <Route
-                  path="/applications/in-progress"
-                  element={<InProgressBoardPage />}
-                />
-                <Route path="/design-resume" element={<DesignResumePage />} />
-                <Route
-                  path="/design-resume/:section"
-                  element={<DesignResumePage />}
-                />
-                <Route path="/onboarding" element={<OnboardingPage />} />
-                <Route path="/offline" element={<OfflinePage />} />
-                <Route path="/sign-in" element={<SignInPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/tracer-links" element={<TracerLinksPage />} />
-                <Route path="/visa-sponsors" element={<VisaSponsorsPage />} />
-                <Route path="/tracking-inbox" element={<TrackingInboxPage />} />
-                <Route path="/watchlist" element={<WatchlistPage />} />
-                <Route
-                  path="/agency/clients"
-                  element={<AuthGuard><WorkerClientsPage /></AuthGuard>}
-                />
-                <Route
-                  path="/agency/clients/:id"
-                  element={<AuthGuard><WorkerClientDashboardPage /></AuthGuard>}
-                />
-                <Route path="/admin/clients" element={<AuthGuard requiredRole="admin"><AdminClientsPage /></AuthGuard>} />
-                <Route path="/admin/clients/new" element={<AuthGuard requiredRole="admin"><AdminClientNewPage /></AuthGuard>} />
-                <Route path="/admin/clients/:id" element={<AuthGuard requiredRole="admin"><AdminClientEditPage /></AuthGuard>} />
-                <Route path="/admin/workers" element={<AuthGuard requiredRole="admin"><AdminWorkersPage /></AuthGuard>} />
-                <Route path="/my-jobs" element={<AuthGuard><MyJobsPage /></AuthGuard>} />
-                <Route path="/my-jobs/:id" element={<AuthGuard><MyJobDetailPage /></AuthGuard>} />
-                <Route path="/jobs/:tab" element={<OrchestratorPage />} />
-                <Route
-                  path="/jobs/:tab/:jobId"
-                  element={<OrchestratorPage />}
-                />
-              </Routes>
+                  {/* Application routes */}
+                  <Route path="/overview" element={<HomePage />} />
+                  <Route
+                    path="/oauth/gmail/callback"
+                    element={<GmailOauthCallbackPage />}
+                  />
+                  <Route path="/job/:id" element={<JobPage />} />
+                  <Route path="/job/:id/:view" element={<JobPage />} />
+                  <Route
+                    path="/applications/in-progress"
+                    element={<InProgressBoardPage />}
+                  />
+                  <Route path="/design-resume" element={<DesignResumePage />} />
+                  <Route
+                    path="/design-resume/:section"
+                    element={<DesignResumePage />}
+                  />
+                  <Route path="/onboarding" element={<OnboardingPage />} />
+                  <Route path="/offline" element={<OfflinePage />} />
+                  <Route path="/sign-in" element={<SignInPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/tracer-links" element={<TracerLinksPage />} />
+                  <Route path="/visa-sponsors" element={<VisaSponsorsPage />} />
+                  <Route path="/tracking-inbox" element={<TrackingInboxPage />} />
+                  <Route path="/watchlist" element={<WatchlistPage />} />
+                  <Route
+                    path="/agency/clients"
+                    element={<AuthGuard><WorkerClientsPage /></AuthGuard>}
+                  />
+                  <Route
+                    path="/agency/clients/:id"
+                    element={<AuthGuard><WorkerClientDashboardPage /></AuthGuard>}
+                  />
+                  <Route path="/admin/clients" element={<AuthGuard requiredRole="admin"><AdminClientsPage /></AuthGuard>} />
+                  <Route path="/admin/clients/new" element={<AuthGuard requiredRole="admin"><AdminClientNewPage /></AuthGuard>} />
+                  <Route path="/admin/clients/:id" element={<AuthGuard requiredRole="admin"><AdminClientEditPage /></AuthGuard>} />
+                  <Route path="/admin/workers" element={<AuthGuard requiredRole="admin"><AdminWorkersPage /></AuthGuard>} />
+                  <Route path="/my-jobs" element={<AuthGuard><MyJobsPage /></AuthGuard>} />
+                  <Route path="/my-jobs/:id" element={<AuthGuard><MyJobDetailPage /></AuthGuard>} />
+                  <Route path="/jobs/:tab" element={<OrchestratorPage />} />
+                  <Route
+                    path="/jobs/:tab/:jobId"
+                    element={<OrchestratorPage />}
+                  />
+                </Routes>
+              </AppErrorBoundary>
             </div>
           </CSSTransition>
         </SwitchTransition>

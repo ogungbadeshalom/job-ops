@@ -106,31 +106,35 @@ function serializeLocationEvidence(
 }
 
 /**
- * Get all jobs, optionally filtered by status.
+ * Get all jobs, optionally filtered by status and clientId.
  */
-export async function getAllJobs(statuses?: JobStatus[]): Promise<Job[]> {
-  const query =
-    statuses && statuses.length > 0
-      ? db
-          .select()
-          .from(jobs)
-          .where(and(jobsScopeFilter(), inArray(jobs.status, statuses)))
-          .orderBy(desc(jobs.discoveredAt))
-      : db
-          .select()
-          .from(jobs)
-          .where(jobsScopeFilter())
-          .orderBy(desc(jobs.discoveredAt));
+export async function getAllJobs(
+  statuses?: JobStatus[],
+  clientId?: string,
+): Promise<Job[]> {
+  const conditions = [jobsScopeFilter()];
+  if (statuses && statuses.length > 0) {
+    conditions.push(inArray(jobs.status, statuses));
+  }
+  if (clientId) {
+    conditions.push(eq(jobs.clientId, clientId));
+  }
 
-  const rows = await query;
+  const rows = await db
+    .select()
+    .from(jobs)
+    .where(and(...conditions))
+    .orderBy(desc(jobs.discoveredAt));
+
   return rows.map(mapRowToJob);
 }
 
 /**
- * Get lightweight list items for jobs, optionally filtered by status.
+ * Get lightweight list items for jobs, optionally filtered by status and clientId.
  */
 export async function getJobListItems(
   statuses?: JobStatus[],
+  clientId?: string,
 ): Promise<JobListItemWithPdfFreshnessInput[]> {
   const selection = {
     id: jobs.id,
@@ -171,20 +175,19 @@ export async function getJobListItems(
     updatedAt: jobs.updatedAt,
   } as const;
 
-  const query =
-    statuses && statuses.length > 0
-      ? db
-          .select(selection)
-          .from(jobs)
-          .where(and(jobsScopeFilter(), inArray(jobs.status, statuses)))
-          .orderBy(desc(jobs.discoveredAt))
-      : db
-          .select(selection)
-          .from(jobs)
-          .where(jobsScopeFilter())
-          .orderBy(desc(jobs.discoveredAt));
+  const conditions = [jobsScopeFilter()];
+  if (statuses && statuses.length > 0) {
+    conditions.push(inArray(jobs.status, statuses));
+  }
+  if (clientId) {
+    conditions.push(eq(jobs.clientId, clientId));
+  }
 
-  const rows = await query;
+  const rows = await db
+    .select(selection)
+    .from(jobs)
+    .where(and(...conditions))
+    .orderBy(desc(jobs.discoveredAt));
   return rows.map((row) => {
     return {
       ...row,
@@ -312,12 +315,17 @@ export async function getAppliedDuplicateMatchCandidates(): Promise<
  */
 export async function getJobsRevision(
   statuses?: JobStatus[],
+  clientId?: string,
 ): Promise<JobsRevisionResponse> {
   const statusFilter = normalizeStatusFilter(statuses);
-  const whereClause =
-    statuses && statuses.length > 0
-      ? and(jobsScopeFilter(), inArray(jobs.status, statuses))
-      : jobsScopeFilter();
+  const conditions = [jobsScopeFilter()];
+  if (statuses && statuses.length > 0) {
+    conditions.push(inArray(jobs.status, statuses));
+  }
+  if (clientId) {
+    conditions.push(eq(jobs.clientId, clientId));
+  }
+  const whereClause = and(...conditions);
 
   const baseQuery = db
     .select({
@@ -799,6 +807,7 @@ export async function getJobStats(): Promise<Record<JobStatus, number>> {
     ready: 0,
     applied: 0,
     in_progress: 0,
+    offer: 0,
     skipped: 0,
     expired: 0,
   };

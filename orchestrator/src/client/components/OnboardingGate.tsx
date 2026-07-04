@@ -3,19 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getAuthBootstrapStatus } from "@/client/api";
 import { useSettings } from "@/client/hooks/useSettings";
-
-function isAdminFromToken(): boolean {
-  try {
-    const token = localStorage.getItem("jobops.authToken");
-    if (!token) return false;
-    const payload = token.split(".")[1];
-    if (!payload) return false;
-    const decoded = JSON.parse(atob(payload));
-    return decoded.isSystemAdmin === true;
-  } catch {
-    return false;
-  }
-}
+import { isAdminFromToken } from "@client/lib/jwt";
 
 export const OnboardingGate: React.FC = () => {
   const location = useLocation();

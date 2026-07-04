@@ -45,8 +45,11 @@ export const queryKeys = {
     all: ["jobs"] as const,
     inProgressBoard: () =>
       [...queryKeys.jobs.all, "in-progress-board"] as const,
-    list: (options?: { statuses?: JobStatus[]; view?: "list" | "full" }) =>
-      [...queryKeys.jobs.all, "list", options ?? {}] as const,
+    list: (options?: {
+      statuses?: JobStatus[];
+      view?: "list" | "full";
+      clientId?: string;
+    }) => [...queryKeys.jobs.all, "list", options ?? {}] as const,
     revision: (options?: { statuses?: JobStatus[] }) =>
       [...queryKeys.jobs.all, "revision", options ?? {}] as const,
     detail: (id: string) => [...queryKeys.jobs.all, "detail", id] as const,

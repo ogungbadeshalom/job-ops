@@ -17,6 +17,7 @@ const initialStats: Record<JobStatus, number> = {
   ready: 0,
   applied: 0,
   in_progress: 0,
+  offer: 0,
   skipped: 0,
   expired: 0,
 };

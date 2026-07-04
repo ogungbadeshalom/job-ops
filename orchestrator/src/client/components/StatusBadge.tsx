@@ -18,6 +18,7 @@ const statusLabels: Record<JobStatus, string> = {
   ready: "Ready",
   applied: "Applied",
   in_progress: "In Progress",
+  offer: "Offer",
   skipped: "Skipped",
   expired: "Expired",
 };
@@ -39,6 +40,10 @@ const statusStyles: Record<
   in_progress: {
     variant: "outline",
     className: "text-cyan-400 border-cyan-500/30",
+  },
+  offer: {
+    variant: "outline",
+    className: "text-purple-400 border-purple-500/30",
   },
   skipped: { variant: "destructive" },
   expired: { variant: "outline", className: "text-muted-foreground" },

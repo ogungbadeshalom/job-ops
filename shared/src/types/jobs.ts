@@ -11,6 +11,7 @@ export type JobStatus =
   | "ready" // PDF generated, waiting for user to apply
   | "applied" // Application sent
   | "in_progress" // In process beyond initial application
+  | "offer" // Offer received
   | "skipped" // User skipped this job
   | "expired"; // Deadline passed
 

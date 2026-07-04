@@ -1,5 +1,6 @@
 import { logout } from "@client/api";
-import { LogOut, UserRound, X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
+import { getUsernameFromToken } from "@client/lib/jwt";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -37,18 +38,7 @@ export const AppSidebar: React.FC<{
   const navLinks = getNavLinks();
   const hidden = location.pathname === "/sign-in" || location.pathname === "/onboarding" || location.pathname === "/offline";
 
-  const username = (() => {
-    try {
-      const token = localStorage.getItem("jobops.authToken");
-      if (!token) return null;
-      const raw = token.split(".")[1];
-      if (!raw) return null;
-      const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
-      const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
-      const decoded = JSON.parse(atob(padded));
-      return typeof decoded.username === "string" ? decoded.username : null;
-    } catch { return null; }
-  })();
+  const username = getUsernameFromToken();
 
   if (hidden) return null;
 

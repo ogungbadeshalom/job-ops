@@ -3,13 +3,18 @@ import {
   AppError,
   badRequest,
   conflict,
+  forbidden,
   notFound,
   requestTimeout,
   serviceUnavailable,
 } from "@infra/errors";
 import { fail, ok, okWithMeta } from "@infra/http";
 import { logger } from "@infra/logger";
-import { runWithRequestContext } from "@infra/request-context";
+import {
+  getUserId,
+  isSystemAdmin,
+  runWithRequestContext,
+} from "@infra/request-context";
 import { setupSse, startSseHeartbeat, writeSseData } from "@infra/sse";
 import { getDataDir } from "@server/config/dataDir";
 import { isDemoMode } from "@server/config/demo";
@@ -29,6 +34,7 @@ import {
 } from "@server/pipeline/index";
 import { getClientById } from "@server/repositories/clients";
 import * as pipelineRepo from "@server/repositories/pipeline";
+import { isWorkerAssignedToClient } from "@server/repositories/worker-assignments";
 import * as pipelineSearchPresetsRepo from "@server/repositories/pipeline-search-presets";
 import { trackCanonicalActivationEvent } from "@server/services/activation-funnel";
 import {
@@ -466,6 +472,20 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
       const client = await getClientById(config.clientId);
       if (!client) {
         return fail(res, notFound("Client not found"));
+      }
+
+      const currentUserId = getUserId();
+      if (currentUserId && !isSystemAdmin()) {
+        const assigned = await isWorkerAssignedToClient(
+          currentUserId,
+          config.clientId,
+        );
+        if (!assigned) {
+          return fail(
+            res,
+            forbidden("You are not assigned to this client"),
+          );
+        }
       }
 
       let clientSearchTerms: string[] = [];

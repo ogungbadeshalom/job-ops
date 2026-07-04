@@ -153,6 +153,11 @@ const statusTone: Record<
     eyebrow: "text-muted-foreground",
     icon: "bg-cyan-500/70",
   },
+  offer: {
+    shell: "border-border/45 bg-muted/10",
+    eyebrow: "text-muted-foreground",
+    icon: "bg-purple-500/70",
+  },
   skipped: {
     shell: "border-border/45 bg-muted/10",
     eyebrow: "text-muted-foreground",
@@ -171,6 +176,7 @@ const getPrimaryAction = (job: Job): string => {
   if (job.status === "discovered") return "Start Tailoring";
   if (job.status === "applied") return "Move to In Progress";
   if (job.status === "in_progress") return "In Progress";
+  if (job.status === "offer") return "Offer";
   if (job.status === "skipped") return "Skipped";
   if (job.status === "expired") return "Expired";
   return "Review Job";

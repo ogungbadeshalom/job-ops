@@ -223,6 +223,7 @@ export const jobActionRequestSchema = z.discriminatedUnion("action", [
 export const listJobsQuerySchema = z.object({
   status: z.string().optional(),
   view: z.enum(["full", "list"]).optional(),
+  clientId: z.string().optional(),
 });
 
 export const jobsRevisionQuerySchema = z.object({

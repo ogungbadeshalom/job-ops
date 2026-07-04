@@ -52,14 +52,17 @@ export function getJobs(): Promise<JobsListResponse<JobListItem>>;
 export function getJobs(options: {
   statuses?: string[];
   view?: "list";
+  clientId?: string;
 }): Promise<JobsListResponse<JobListItem>>;
 export function getJobs(options?: {
   statuses?: string[];
   view: "full";
+  clientId?: string;
 }): Promise<JobsListResponse<Job>>;
 export async function getJobs(options?: {
   statuses?: string[];
   view?: "full" | "list";
+  clientId?: string;
 }): Promise<JobsListResponse<Job> | JobsListResponse<JobListItem>> {
   return fetchApi<JobsListResponse<Job> | JobsListResponse<JobListItem>>(
     withQuery("/jobs", {
@@ -67,6 +70,7 @@ export async function getJobs(options?: {
         ? options.statuses.join(",")
         : undefined,
       view: options?.view,
+      clientId: options?.clientId,
     }),
   );
 }

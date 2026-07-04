@@ -223,12 +223,14 @@ export const AdminWorkersPage: React.FC = () => {
                       size="sm"
                       variant="outline"
                       disabled={disableUserMutation.isPending}
-                      onClick={() =>
+                      onClick={() => {
+                        const action = user.isDisabled ? "Enable" : "Disable";
+                        if (!window.confirm(`${action} this worker?`)) return;
                         disableUserMutation.mutate({
                           userId: user.id,
                           isDisabled: !user.isDisabled,
                         })
-                      }
+                      }}
                     >
                       {user.isDisabled ? "Enable" : "Disable"}
                     </Button>

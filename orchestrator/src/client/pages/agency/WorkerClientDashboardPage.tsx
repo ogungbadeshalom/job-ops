@@ -145,8 +145,8 @@ export const WorkerClientDashboardPage: React.FC = () => {
     data: jobsResponse,
     isLoading: jobsLoading,
   } = useQuery({
-    queryKey: queryKeys.jobs.list({ view: "list" }),
-    queryFn: () => api.getJobs({ view: "list" }),
+    queryKey: queryKeys.jobs.list({ view: "list", clientId: id }),
+    queryFn: () => api.getJobs({ view: "list", clientId: id }),
   });
 
   const applyMutation = useMutation({

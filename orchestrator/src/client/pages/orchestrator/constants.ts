@@ -57,6 +57,11 @@ export const statusTokens: Record<
     badge: "border-cyan-500/30 bg-cyan-500/10 text-cyan-200",
     dot: "bg-cyan-400",
   },
+  offer: {
+    label: "Offer",
+    badge: "border-purple-500/30 bg-purple-500/10 text-purple-200",
+    dot: "bg-purple-400",
+  },
   skipped: {
     label: "Skipped",
     badge: "border-rose-500/30 bg-rose-500/10 text-rose-200",

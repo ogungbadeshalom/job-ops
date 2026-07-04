@@ -2,6 +2,7 @@ import {
   useClientJob,
   useClientJobStageEvents,
 } from "@client/hooks/useClientJob";
+import { getCachedAuthHeader } from "@client/api/auth-session";
 import { STAGE_LABELS } from "@shared/types";
 import type { StageEvent } from "@shared/types";
 import {
@@ -50,21 +51,27 @@ export const MyJobDetailPage: React.FC = () => {
   const { data: events, isLoading: eventsLoading } =
     useClientJobStageEvents(id);
 
-  const handleDownloadCv = () => {
+  const handleDownloadCv = async () => {
     if (!id) return;
-    const token = localStorage.getItem("jobops-auth-token");
     const url = `/api/jobs/${encodeURIComponent(id)}/pdf`;
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "";
-    anchor.target = "_blank";
-    anchor.rel = "noopener noreferrer";
-    if (token) {
-      anchor.href = `${url}?token=${encodeURIComponent(token)}`;
+    const authHeader = getCachedAuthHeader();
+    try {
+      const response = await fetch(url, {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = "cv.pdf";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, "_blank");
     }
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
   };
 
   if (jobLoading) {
