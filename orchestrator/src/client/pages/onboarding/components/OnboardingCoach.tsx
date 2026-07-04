@@ -29,7 +29,7 @@ function readDismissed(storageKey: string): boolean {
   try {
     return sessionStorage.getItem(getAuthScopedStorageKey(storageKey)) === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -42,11 +42,13 @@ function writeDismissed(storageKey: string): void {
 }
 
 function removeJoyridePortal(): void {
-  try {
-    document.getElementById("react-joyride-portal")?.remove();
-  } catch {
-    // Ignore DOM cleanup failures; unmounting Joyride is the primary cleanup.
-  }
+  setTimeout(() => {
+    try {
+      document.getElementById("react-joyride-portal")?.remove();
+    } catch {
+      // Ignore DOM cleanup failures.
+    }
+  }, 100);
 }
 
 function CoachTooltip({
@@ -268,7 +270,6 @@ export const OnboardingCoach: React.FC<{
     }
 
     if (data.type === EVENTS.TARGET_NOT_FOUND) {
-      setStepIndex((current) => Math.min(current + 1, steps.length - 1));
       return;
     }
 

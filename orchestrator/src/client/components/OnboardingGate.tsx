@@ -1,9 +1,21 @@
 import { useOnboardingStatus } from "@client/hooks/useOnboardingStatus";
-import type React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getAuthBootstrapStatus } from "@/client/api";
 import { useSettings } from "@/client/hooks/useSettings";
+
+function isAdminFromToken(): boolean {
+  try {
+    const token = localStorage.getItem("jobops.authToken");
+    if (!token) return false;
+    const payload = token.split(".")[1];
+    if (!payload) return false;
+    const decoded = JSON.parse(atob(payload));
+    return decoded.isSystemAdmin === true || decoded.role === "owner" || decoded.role === "admin";
+  } catch {
+    return false;
+  }
+}
 
 export const OnboardingGate: React.FC = () => {
   const location = useLocation();
@@ -71,17 +83,25 @@ export const OnboardingGate: React.FC = () => {
 const OnboardingRedirect: React.FC = () => {
   const { error } = useSettings();
   const { checking, complete } = useOnboardingStatus();
+  const isAdmin = isAdminFromToken();
 
   if (error) {
     if (!navigator.onLine) {
       return <Navigate to="/offline" replace />;
     }
-    return <Navigate to="/onboarding" replace />;
+    if (isAdmin) {
+      return <Navigate to="/onboarding" replace />;
+    }
+    return null;
   }
 
   if (checking || complete) {
     return null;
   }
 
-  return <Navigate to="/onboarding" replace />;
+  if (isAdmin) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return null;
 };
