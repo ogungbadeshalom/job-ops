@@ -245,37 +245,3 @@ export async function getClientJobCount(
     offer: 0,
   };
 }
-
-export async function getClientLoginStatus(
-  clientId: string,
-): Promise<{ hasLogin: boolean; username?: string }> {
-  const tenantId = getActiveTenantId();
-  const client = await getClientById(clientId);
-  if (!client) return { hasLogin: false };
-
-  const [row] = await db
-    .select({ id: users.id, username: users.username })
-    .from(users)
-    .where(
-      and(
-        eq(users.id, client.createdBy),
-        eq(users.isDisabled, false),
-      ),
-    )
-    .limit(1);
-
-  if (!row) return { hasLogin: false };
-
-  return { hasLogin: true, username: row.username };
-}
-
-export async function setClientCreatedBy(
-  clientId: string,
-  userId: string,
-): Promise<void> {
-  const tenantId = getActiveTenantId();
-  await db
-    .update(clients)
-    .set({ createdBy: userId, updatedAt: new Date().toISOString() })
-    .where(and(eq(clients.id, clientId), eq(clients.tenantId, tenantId)));
-}
