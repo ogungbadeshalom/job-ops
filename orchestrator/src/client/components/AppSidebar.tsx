@@ -37,17 +37,17 @@ export const AppSidebar: React.FC<{
   const navLinks = getNavLinks();
   const hidden = location.pathname === "/sign-in" || location.pathname === "/onboarding" || location.pathname === "/offline";
 
-  const role = (() => {
+  const username = (() => {
     try {
       const token = localStorage.getItem("jobops.authToken");
-      if (!token) return "no-token";
+      if (!token) return null;
       const raw = token.split(".")[1];
-      if (!raw) return "no-payload";
+      if (!raw) return null;
       const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
       const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
       const decoded = JSON.parse(atob(padded));
-      return decoded.role ?? "no-role";
-    } catch { return "error"; }
+      return typeof decoded.username === "string" ? decoded.username : null;
+    } catch { return null; }
   })();
 
   if (hidden) return null;
@@ -68,7 +68,8 @@ export const AppSidebar: React.FC<{
         )}
       >
         <div className="flex h-14 items-center justify-between border-b px-4">
-          <span className="font-semibold text-sm">JobOps <span className="text-muted-foreground text-xs ml-1">({role})</span></span>
+          <span className="font-semibold text-sm">JobOps</span>
+          {username && <span className="text-xs text-muted-foreground truncate ml-2">{username}</span>}
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
