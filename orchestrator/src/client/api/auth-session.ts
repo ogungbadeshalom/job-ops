@@ -45,9 +45,9 @@ function getTenantIdFromAuthToken(token: string | null): string | null {
 
 function loadStoredLegacyCredentials(): AuthCredentials | null {
   try {
-    const stored = sessionStorage.getItem(LEGACY_SESSION_AUTH_KEY);
+    const stored = localStorage.getItem(LEGACY_SESSION_AUTH_KEY);
     if (!stored) return null;
-    sessionStorage.removeItem(LEGACY_SESSION_AUTH_KEY);
+    localStorage.removeItem(LEGACY_SESSION_AUTH_KEY);
 
     const parsed = JSON.parse(stored) as StoredLegacyAuthCredentials;
     if (
@@ -78,7 +78,7 @@ function loadStoredLegacyCredentials(): AuthCredentials | null {
 function storeLegacyCredentials(credentials: AuthCredentials | null): void {
   try {
     if (credentials) {
-      sessionStorage.setItem(
+      localStorage.setItem(
         LEGACY_SESSION_AUTH_KEY,
         JSON.stringify({
           ...credentials,
@@ -86,7 +86,7 @@ function storeLegacyCredentials(credentials: AuthCredentials | null): void {
         } satisfies StoredLegacyAuthCredentials),
       );
     } else {
-      sessionStorage.removeItem(LEGACY_SESSION_AUTH_KEY);
+      localStorage.removeItem(LEGACY_SESSION_AUTH_KEY);
     }
   } catch {
     // Ignore storage errors in restricted browser contexts.
@@ -96,8 +96,8 @@ function storeLegacyCredentials(credentials: AuthCredentials | null): void {
 function loadStoredAuthToken(): string | null {
   try {
     return (
-      sessionStorage.getItem(SESSION_AUTH_TOKEN_KEY) ??
-      sessionStorage.getItem(LEGACY_SESSION_JWT_KEY)
+      localStorage.getItem(SESSION_AUTH_TOKEN_KEY) ??
+      localStorage.getItem(LEGACY_SESSION_JWT_KEY)
     );
   } catch {
     return null;
@@ -107,11 +107,11 @@ function loadStoredAuthToken(): string | null {
 function storeAuthToken(token: string | null): void {
   try {
     if (token) {
-      sessionStorage.setItem(SESSION_AUTH_TOKEN_KEY, token);
-      sessionStorage.removeItem(LEGACY_SESSION_JWT_KEY);
+      localStorage.setItem(SESSION_AUTH_TOKEN_KEY, token);
+      localStorage.removeItem(LEGACY_SESSION_JWT_KEY);
     } else {
-      sessionStorage.removeItem(SESSION_AUTH_TOKEN_KEY);
-      sessionStorage.removeItem(LEGACY_SESSION_JWT_KEY);
+      localStorage.removeItem(SESSION_AUTH_TOKEN_KEY);
+      localStorage.removeItem(LEGACY_SESSION_JWT_KEY);
     }
   } catch {
     // Ignore storage errors in restricted browser contexts.
