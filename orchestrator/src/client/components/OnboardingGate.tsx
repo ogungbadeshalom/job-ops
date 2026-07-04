@@ -11,7 +11,7 @@ function isAdminFromToken(): boolean {
     const payload = token.split(".")[1];
     if (!payload) return false;
     const decoded = JSON.parse(atob(payload));
-    return decoded.isSystemAdmin === true || decoded.role === "owner" || decoded.role === "admin";
+    return decoded.isSystemAdmin === true;
   } catch {
     return false;
   }
