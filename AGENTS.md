@@ -128,3 +128,73 @@ CI runs on Node 22. If local behavior differs, verify with Node 22 before conclu
 
 - For focused changes, run targeted tests first (for touched files/modules), then still run the full CI-parity list above before finalizing.
 - A change is considered valid only when all required checks pass without ignored failures.
+
+---
+
+# Agency Platform Extension
+
+> Read this before any agency-related changes. Single source of truth.
+
+## Architecture
+
+Three roles for the agency use case:
+
+| Role | JWT field | Access |
+|------|-----------|--------|
+| `admin` | `isSystemAdmin: true` | Full access. Manage clients, workers, assignments. Configure LLM. |
+| `worker` | `isSystemAdmin: false` | See assigned clients, run pipeline, apply to jobs. |
+| `client` | `isSystemAdmin: false` | Read-only dashboard of own jobs, download CVs. |
+
+**Tables added:** `clients`, `worker_client_assignments`. `client_id` on `jobs` and `pipeline_runs`.
+
+**Role in JWT:** stored in `tenant_memberships.role` and embedded in JWT. Admin detection uses `isSystemAdmin` flag ONLY — not the role field.
+
+## Workflow
+
+1. **Admin** creates client at `/admin/clients/new` (name, email, search terms)
+2. **Admin** creates worker at `/admin/workers` (username, password)
+3. **Admin** assigns worker to client at `/admin/clients/:id`
+4. **Worker** logs in → sidebar "My Clients" → `/agency/clients` → runs pipeline → applies manually → marks status
+5. **Client** logs in → `/my-jobs` → sees all jobs, statuses, downloads CVs
+
+## Sidebar Nav (Role-Based)
+
+| Admin | Worker | Client |
+|-------|--------|--------|
+| Overview, Jobs, In Progress, **Clients**, **Workers**, **My Clients**, Tracking Inbox, Settings | Overview, Jobs, In Progress, **My Clients**, Tracking Inbox, Settings | My Jobs |
+
+Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume (code kept, not in UI).
+
+## Design Decisions
+
+- **localStorage** over sessionStorage — token persists across browser tabs
+- **isSystemAdmin** for admin check — workers get `role: "owner"` by default
+- **Base64url decode** in JWT — normalize `-_` → `+/` before `atob()`
+- **AppSidebar + SidebarContext** — replaced broken shadcn Sheet
+- **PM2 not Docker** — 38GB VPS too small for Docker layers
+- **Port 3001** — direct Node.js deployment, not Docker's 3005
+
+## Known Bug Fixes
+
+1. **`React is not defined`** — `import type React` stripped but `React.useState()` used. Fixed: full import.
+2. **401 cascade** — auth token missing before page render. Fixed: `AuthGuard` component.
+3. **Worker redirected to onboarding** — checked `role === "owner"`. Fixed: only check `isSystemAdmin`.
+4. **Hamburger broken** — old Sheet CSS issue. Fixed: `AppSidebar` + context.
+5. **Base64url decode fail** — `atob()` on raw JWT. Fixed: normalized first.
+6. **"My Clients" missing** — `role !== "client"` condition added.
+
+## Priority Build Queue
+
+1. Client account creation ← NEXT
+2. Wire pipeline "Run" button
+3. Onboarding edge cases
+4. IMAP (optional)
+
+## Validation
+
+Before marking agency work complete:
+- [ ] Admin creates client + worker + assigns
+- [ ] Worker logs in, sees "My Clients", runs pipeline
+- [ ] Worker marks jobs as applied
+- [ ] Client logs in, sees `/my-jobs` with their jobs
+- [ ] Existing features (Jobs, Settings, etc.) still work

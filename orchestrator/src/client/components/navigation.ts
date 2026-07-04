@@ -1,14 +1,10 @@
 import {
   Building2,
   Columns3,
-  Eye,
-  FilePenLine,
   Home,
   Inbox,
   LayoutDashboard,
-  Link2,
   Settings,
-  Shield,
   UserCog,
   Users,
 } from "lucide-react";
@@ -25,9 +21,14 @@ function decodePayload(token: string): Record<string, unknown> | null {
     const raw = token.split(".")[1];
     if (!raw) return null;
     const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "=",
+    );
     const decoded = JSON.parse(atob(padded));
-    return decoded && typeof decoded === "object" ? (decoded as Record<string, unknown>) : null;
+    return decoded && typeof decoded === "object"
+      ? (decoded as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
@@ -55,24 +56,13 @@ const SHARED_NAV: NavLink[] = [
     to: "/jobs/ready",
     label: "Jobs",
     icon: LayoutDashboard,
-    activePaths: [
-      "/jobs/ready",
-      "/jobs/discovered",
-      "/jobs/applied",
-      "/jobs/all",
-    ],
+    activePaths: ["/jobs/ready", "/jobs/discovered", "/jobs/applied"],
   },
   {
     to: "/applications/in-progress",
     label: "In Progress",
     icon: Columns3,
     activePaths: ["/applications/in-progress"],
-  },
-  {
-    to: "/design-resume",
-    label: "Resume Studio",
-    icon: FilePenLine,
-    activePaths: ["/design-resume"],
   },
   { to: "/tracking-inbox", label: "Tracking Inbox", icon: Inbox },
 ];
@@ -128,17 +118,7 @@ export function getNavLinks(): NavLink[] {
     links.push(...AGENCY_NAV);
   }
 
-  links.push(
-    {
-      to: "/tracer-links",
-      label: "Tracer Links",
-      icon: Link2,
-      activePaths: ["/tracer-links"],
-    },
-    { to: "/visa-sponsors", label: "Visa Sponsors", icon: Shield },
-    { to: "/watchlist", label: "Watchlist", icon: Eye },
-    { to: "/settings", label: "Settings", icon: Settings },
-  );
+  links.push({ to: "/settings", label: "Settings", icon: Settings });
 
   return links;
 }
