@@ -2,7 +2,7 @@ import * as api from "@client/api";
 import { PageHeader } from "@client/components/layout";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft, UserPlus } from "lucide-react";
-import type React from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { showErrorToast } from "@/client/lib/error-toast";

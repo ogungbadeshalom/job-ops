@@ -1,6 +1,5 @@
 import { hasAuthenticatedSession } from "@/client/api/auth-session";
-import type React from "react";
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 interface AuthGuardProps {
