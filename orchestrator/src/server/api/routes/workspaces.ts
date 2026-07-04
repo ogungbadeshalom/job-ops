@@ -62,6 +62,7 @@ workspacesRouter.post(
         password: parsed.data.password,
         displayName: parsed.data.displayName ?? parsed.data.username,
         isSystemAdmin: parsed.data.isSystemAdmin ?? false,
+        useDefaultTenant: true,
         role: parsed.data.isSystemAdmin ? "admin" : "worker",
       });
       ok(res, { user }, 201);
