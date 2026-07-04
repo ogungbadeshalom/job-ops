@@ -4,6 +4,7 @@ import { getActiveTenantId } from "@server/tenancy/context";
 import {
   type NewClientRow,
   createClient,
+  deleteClient,
   getClientById,
   getClientForClientUser,
   getClientJobCount,
@@ -156,6 +157,20 @@ clientsRouter.patch(
       return;
     }
     ok(res, { client });
+  }),
+);
+
+clientsRouter.delete(
+  "/:id",
+  asyncRoute(async (req: Request, res: Response) => {
+    if (!requireAdmin(res)) return;
+
+    const deleted = await deleteClient(req.params.id);
+    if (!deleted) {
+      fail(res, notFound("Client not found"));
+      return;
+    }
+    ok(res, { deleted: true });
   }),
 );
 

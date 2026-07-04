@@ -154,8 +154,10 @@ Three roles for the agency use case:
 1. **Admin** creates client at `/admin/clients/new` (name, email, search terms)
 2. **Admin** creates worker at `/admin/workers` (username, password)
 3. **Admin** assigns worker to client at `/admin/clients/:id`
-4. **Worker** logs in → sidebar "My Clients" → `/agency/clients` → runs pipeline → applies manually → marks status
-5. **Client** logs in → `/my-jobs` → sees all jobs, statuses, downloads CVs
+4. **Admin** creates client login at `/admin/clients/:id` → shares credentials
+5. **Worker** logs in → sidebar "My Clients" → `/agency/clients` → runs pipeline → applies manually → marks status
+6. **Client** logs in → `/my-jobs` → sees all jobs, statuses, downloads CVs
+7. **Admin deletes** clients at `/admin/clients` (permanent, not archive)
 
 ## Sidebar Nav (Role-Based)
 
@@ -182,19 +184,23 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume (code ke
 4. **Hamburger broken** — old Sheet CSS issue. Fixed: `AppSidebar` + context.
 5. **Base64url decode fail** — `atob()` on raw JWT. Fixed: normalized first.
 6. **"My Clients" missing** — `role !== "client"` condition added.
+7. **Duplicate export crash** — sub-agents both added same functions to repo. Fixed: removed duplicates.
+8. **Role constraint too strict** — `tenant_memberships.role` only allowed `owner`/`member`. Fixed: migration recreates table with full role set.
 
-## Priority Build Queue
+## Priority Build Queue (Current)
 
-1. Client account creation ← NEXT
-2. Wire pipeline "Run" button
-3. Onboarding edge cases
-4. IMAP (optional)
+1. ✅ Client account creation (create-login endpoint + UI)
+2. ✅ Wire pipeline "Run" button (with SSE progress)
+3. ⏳ Onboarding edge cases (known issue: worker still sees wizard)
+4. ⏳ IMAP (deferred)
 
 ## Validation
 
 Before marking agency work complete:
-- [ ] Admin creates client + worker + assigns
-- [ ] Worker logs in, sees "My Clients", runs pipeline
-- [ ] Worker marks jobs as applied
-- [ ] Client logs in, sees `/my-jobs` with their jobs
+- [x] Admin creates client + worker + assigns
+- [x] Worker logs in, sees "My Clients", runs pipeline
+- [x] Worker marks jobs as applied
+- [x] Client logs in, sees `/my-jobs` with their jobs
+- [x] Client account login from admin panel
+- [x] Client delete (permanent, not archive)
 - [ ] Existing features (Jobs, Settings, etc.) still work

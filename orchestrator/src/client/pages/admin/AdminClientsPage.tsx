@@ -35,21 +35,20 @@ export const AdminClientsPage: React.FC = () => {
   });
 
   const archiveMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.updateClient(id, { status: "archived" }),
+    mutationFn: (id: string) => api.deleteClient(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
-      toast.success("Client archived");
+      toast.success("Client deleted");
     },
     onError: (error) => {
-      showErrorToast(error, "Failed to archive client");
+      showErrorToast(error, "Failed to delete client");
     },
   });
 
   useQueryErrorToast(error, "Failed to load clients");
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Archive client "${name}"?`)) return;
+    if (!window.confirm(`Delete client "${name}"? This cannot be undone.`)) return;
     setDeletingId(id);
     try {
       await archiveMutation.mutateAsync(id);
@@ -143,7 +142,7 @@ export const AdminClientsPage: React.FC = () => {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive"
-                        title="Archive client"
+                        title="Delete client"
                         disabled={deletingId === client.id || client.status === "archived"}
                         onClick={() => handleDelete(client.id, client.name)}
                       >

@@ -104,6 +104,13 @@ export async function updateClient(
   return result.client;
 }
 
+export async function deleteClient(id: string): Promise<void> {
+  await fetchApi<{ deleted: boolean }>(
+    `/clients/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function fetchAssignments(): Promise<Assignment[]> {
   const result = await fetchApi<{ assignments: Assignment[] }>("/assignments");
   return result.assignments;

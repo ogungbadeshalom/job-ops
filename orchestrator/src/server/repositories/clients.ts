@@ -169,6 +169,19 @@ export async function updateClient(
   return getClientById(id);
 }
 
+export async function deleteClient(
+  id: string,
+): Promise<boolean> {
+  const tenantId = getActiveTenantId();
+  const client = await getClientById(id);
+  if (!client) return false;
+
+  await db
+    .delete(clients)
+    .where(and(eq(clients.id, id), eq(clients.tenantId, tenantId)));
+  return true;
+}
+
 export async function getClientLoginStatus(
   clientId: string,
 ): Promise<{ hasLogin: boolean; clientUserId: string | null }> {
