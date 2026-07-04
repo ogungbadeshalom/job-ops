@@ -16,6 +16,7 @@ import { CSSTransition, SwitchTransition } from "react-transition-group";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthGuard } from "./components/AuthGuard";
+import { DesktopSidebar } from "./components/DesktopSidebar";
 import { OnboardingGate } from "./components/OnboardingGate";
 import { useAnalyticsIdentity } from "./hooks/useAnalyticsIdentity";
 import { useDemoInfo } from "./hooks/useDemoInfo";
@@ -112,6 +113,7 @@ export const App: React.FC = () => {
   return (
     <>
       <OnboardingGate />
+      <DesktopSidebar />
       {showDemoBanners && (
         <div className="sticky top-0 z-50 w-full border-b border-amber-400/50 bg-amber-500/20 px-4 py-2 text-xs text-amber-100 shadow-sm backdrop-blur">
           <div className="mx-auto flex items-center justify-center gap-3">
@@ -161,7 +163,7 @@ export const App: React.FC = () => {
           </div>
         </div>
       )}
-      <div>
+      <div className="lg:ml-60">
         <SwitchTransition mode="out-in">
           <CSSTransition
             key={pageKey}
