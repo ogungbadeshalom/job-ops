@@ -15,6 +15,7 @@ import { CSSTransition, SwitchTransition } from "react-transition-group";
 
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthGuard } from "./components/AuthGuard";
 import { OnboardingGate } from "./components/OnboardingGate";
 import { useAnalyticsIdentity } from "./hooks/useAnalyticsIdentity";
 import { useDemoInfo } from "./hooks/useDemoInfo";
@@ -207,18 +208,18 @@ export const App: React.FC = () => {
                 <Route path="/watchlist" element={<WatchlistPage />} />
                 <Route
                   path="/agency/clients"
-                  element={<WorkerClientsPage />}
+                  element={<AuthGuard><WorkerClientsPage /></AuthGuard>}
                 />
                 <Route
                   path="/agency/clients/:id"
-                  element={<WorkerClientDashboardPage />}
+                  element={<AuthGuard><WorkerClientDashboardPage /></AuthGuard>}
                 />
-                <Route path="/admin/clients" element={<AdminClientsPage />} />
-                <Route path="/admin/clients/new" element={<AdminClientNewPage />} />
-                <Route path="/admin/clients/:id" element={<AdminClientEditPage />} />
-                <Route path="/admin/workers" element={<AdminWorkersPage />} />
-                <Route path="/my-jobs" element={<MyJobsPage />} />
-                <Route path="/my-jobs/:id" element={<MyJobDetailPage />} />
+                <Route path="/admin/clients" element={<AuthGuard requiredRole="admin"><AdminClientsPage /></AuthGuard>} />
+                <Route path="/admin/clients/new" element={<AuthGuard requiredRole="admin"><AdminClientNewPage /></AuthGuard>} />
+                <Route path="/admin/clients/:id" element={<AuthGuard requiredRole="admin"><AdminClientEditPage /></AuthGuard>} />
+                <Route path="/admin/workers" element={<AuthGuard requiredRole="admin"><AdminWorkersPage /></AuthGuard>} />
+                <Route path="/my-jobs" element={<AuthGuard><MyJobsPage /></AuthGuard>} />
+                <Route path="/my-jobs/:id" element={<AuthGuard><MyJobDetailPage /></AuthGuard>} />
                 <Route path="/jobs/:tab" element={<OrchestratorPage />} />
                 <Route
                   path="/jobs/:tab/:jobId"
