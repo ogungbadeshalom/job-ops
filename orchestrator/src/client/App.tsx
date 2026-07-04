@@ -16,8 +16,14 @@ import { CSSTransition, SwitchTransition } from "react-transition-group";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthGuard } from "./components/AuthGuard";
-import { DesktopSidebar } from "./components/DesktopSidebar";
+import { AppSidebar } from "./components/AppSidebar";
 import { OnboardingGate } from "./components/OnboardingGate";
+import { SidebarProvider, useSidebar } from "./components/SidebarContext";
+
+const AppSidebarWrapper: React.FC = () => {
+  const { open, setOpen } = useSidebar();
+  return <AppSidebar open={open} onClose={() => setOpen(false)} />;
+};
 import { useAnalyticsIdentity } from "./hooks/useAnalyticsIdentity";
 import { useDemoInfo } from "./hooks/useDemoInfo";
 import { setAuthNavigator } from "./lib/auth-navigation";
@@ -111,9 +117,10 @@ export const App: React.FC = () => {
   }, [navigate]);
 
   return (
-    <>
+    <SidebarProvider>
       <OnboardingGate />
-      <DesktopSidebar />
+      <AppSidebarWrapper />
+      <div className="lg:ml-64">
       {showDemoBanners && (
         <div className="sticky top-0 z-50 w-full border-b border-amber-400/50 bg-amber-500/20 px-4 py-2 text-xs text-amber-100 shadow-sm backdrop-blur">
           <div className="mx-auto flex items-center justify-center gap-3">
@@ -163,7 +170,7 @@ export const App: React.FC = () => {
           </div>
         </div>
       )}
-      <div className="lg:ml-60">
+      <div>
         <SwitchTransition mode="out-in">
           <CSSTransition
             key={pageKey}
@@ -232,8 +239,9 @@ export const App: React.FC = () => {
           </CSSTransition>
         </SwitchTransition>
       </div>
+      </div>
 
       <Toaster position="bottom-right" richColors closeButton />
-    </>
+    </SidebarProvider>
   );
 };
