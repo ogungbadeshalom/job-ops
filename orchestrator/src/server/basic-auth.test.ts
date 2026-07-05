@@ -306,6 +306,7 @@ describe.sequential("Auth read-only enforcement", () => {
       tenantId: "tenant-1",
       username: "user",
       isSystemAdmin: false,
+      role: "owner",
     });
     vi.mocked(getUserById).mockResolvedValue({
       id: "user-1",
@@ -345,6 +346,7 @@ describe.sequential("Auth read-only enforcement", () => {
       tenantId: "tenant-1",
       username: "user",
       isSystemAdmin: true,
+      role: "owner",
     });
     vi.mocked(getUserById).mockResolvedValue({
       id: "user-1",
