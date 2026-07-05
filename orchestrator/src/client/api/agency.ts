@@ -1,5 +1,5 @@
-import type { AuthUser } from "./auth";
 import type { Client } from "@shared/types";
+import type { AuthUser } from "./auth";
 import { fetchApi } from "./core";
 
 export interface ClientWithAssignment extends Client {
@@ -16,11 +16,6 @@ export interface ClientStats {
 
 interface ClientsListResponse {
   clients: ClientWithAssignment[];
-}
-
-export interface ClientDetailResponse {
-  client: ClientWithAssignment;
-  stats: ClientStats;
 }
 
 interface ClientStatsResponse {
@@ -71,8 +66,14 @@ export async function fetchClients(): Promise<ClientWithAssignment[]> {
   return response.clients;
 }
 
-export async function fetchClient(id: string): Promise<ClientDetailResponse> {
-  return fetchApi<ClientDetailResponse>(`/clients/${id}`);
+export async function fetchClient(
+  id: string,
+): Promise<ClientWithAssignment & { stats: ClientStats }> {
+  const { client, stats } = await fetchApi<{
+    client: ClientWithAssignment;
+    stats: ClientStats;
+  }>(`/clients/${id}`);
+  return { ...client, stats };
 }
 
 export async function fetchClientStats(id: string): Promise<ClientStats> {
@@ -105,10 +106,9 @@ export async function updateClient(
 }
 
 export async function deleteClient(id: string): Promise<void> {
-  await fetchApi<{ deleted: boolean }>(
-    `/clients/${encodeURIComponent(id)}`,
-    { method: "DELETE" },
-  );
+  await fetchApi<{ deleted: boolean }>(`/clients/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function fetchAssignments(): Promise<Assignment[]> {

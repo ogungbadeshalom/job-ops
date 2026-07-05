@@ -79,11 +79,11 @@ describe("API client auth flow", () => {
 
     vi.spyOn(global, "fetch").mockResolvedValueOnce(jwtLoginSuccess());
 
-    const storedBefore = sessionStorage.getItem("jobops.basicAuthCredentials");
+    const storedBefore = localStorage.getItem("jobops.basicAuthCredentials");
     expect(storedBefore).toContain('"password"');
 
     const promise = api.restoreAuthSessionFromLegacyCredentials();
-    expect(sessionStorage.getItem("jobops.basicAuthCredentials")).toBeNull();
+    expect(localStorage.getItem("jobops.basicAuthCredentials")).toBeNull();
     await expect(promise).resolves.toBe(true);
   });
 

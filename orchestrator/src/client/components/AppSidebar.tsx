@@ -1,6 +1,6 @@
 import { logout } from "@client/api";
-import { LogOut, X } from "lucide-react";
 import { getUsernameFromToken } from "@client/lib/jwt";
+import { LogOut, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,10 @@ export const AppSidebar: React.FC<{
   };
 
   const navLinks = getNavLinks();
-  const hidden = location.pathname === "/sign-in" || location.pathname === "/onboarding" || location.pathname === "/offline";
+  const hidden =
+    location.pathname === "/sign-in" ||
+    location.pathname === "/onboarding" ||
+    location.pathname === "/offline";
 
   const username = getUsernameFromToken();
 
@@ -59,8 +62,17 @@ export const AppSidebar: React.FC<{
       >
         <div className="flex h-14 items-center justify-between border-b px-4">
           <span className="font-semibold text-sm">JobOps</span>
-          {username && <span className="text-xs text-muted-foreground truncate ml-2">{username}</span>}
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={onClose}>
+          {username && (
+            <span className="text-xs text-muted-foreground truncate ml-2">
+              {username}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={onClose}
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -83,7 +95,12 @@ export const AppSidebar: React.FC<{
           ))}
         </nav>
         <div className="border-t p-3 space-y-2">
-          <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-muted-foreground" onClick={handleSignOut}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-xs text-muted-foreground"
+            onClick={handleSignOut}
+          >
             <LogOut className="h-3.5 w-3.5 mr-2" />
             Sign out
           </Button>

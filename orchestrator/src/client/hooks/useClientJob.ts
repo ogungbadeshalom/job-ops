@@ -2,11 +2,10 @@ import * as api from "@client/api";
 import type { Job, JobsListResponse, StageEvent } from "@shared/types";
 import { useQuery } from "@tanstack/react-query";
 
-export function useClientJobs(clientId: string | undefined) {
+export function useClientJobs(clientId?: string) {
   return useQuery<JobsListResponse<Job>>({
     queryKey: ["client", "jobs", clientId],
-    queryFn: () => api.fetchMyJobs(clientId!),
-    enabled: !!clientId,
+    queryFn: () => api.fetchMyJobs(clientId),
     staleTime: 30_000,
   });
 }

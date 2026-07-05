@@ -1,5 +1,5 @@
 import * as api from "@client/api";
-import { PageHeader, PageMain, EmptyState } from "@client/components/layout";
+import { EmptyState, PageHeader, PageMain } from "@client/components/layout";
 import { showErrorToast } from "@client/lib/error-toast";
 import { queryKeys } from "@client/lib/queryKeys";
 import { subscribeToEventSource } from "@client/lib/sse";
@@ -22,12 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -141,10 +136,7 @@ export const WorkerClientDashboardPage: React.FC = () => {
     enabled: Boolean(id),
   });
 
-  const {
-    data: jobsResponse,
-    isLoading: jobsLoading,
-  } = useQuery({
+  const { data: jobsResponse, isLoading: jobsLoading } = useQuery({
     queryKey: queryKeys.jobs.list({ view: "list", clientId: id }),
     queryFn: () => api.getJobs({ view: "list", clientId: id }),
   });
@@ -245,7 +237,7 @@ export const WorkerClientDashboardPage: React.FC = () => {
     showErrorToast(clientErrorObj, "Failed to load client");
   }
 
-  const client = clientDetail?.client;
+  const client = clientDetail;
   const stats = clientDetail?.stats ?? {
     total: 0,
     applied: 0,
@@ -260,11 +252,7 @@ export const WorkerClientDashboardPage: React.FC = () => {
       <PageHeader
         icon={Building2}
         title={client?.name ?? "Client Dashboard"}
-        subtitle={
-          client
-            ? `${client.email}`
-            : "Loading..."
-        }
+        subtitle={client ? `${client.email}` : "Loading..."}
         actions={
           <Button
             variant="outline"
@@ -320,21 +308,13 @@ export const WorkerClientDashboardPage: React.FC = () => {
                 label="Total Jobs"
                 value={stats.total}
               />
-              <StatCard
-                icon={Send}
-                label="Applied"
-                value={stats.applied}
-              />
+              <StatCard icon={Send} label="Applied" value={stats.applied} />
               <StatCard
                 icon={UserRoundCheck}
                 label="Interviewing"
                 value={stats.interviewing}
               />
-              <StatCard
-                icon={Trophy}
-                label="Offers"
-                value={stats.offer}
-              />
+              <StatCard icon={Trophy} label="Offers" value={stats.offer} />
             </div>
 
             <Card>
@@ -390,9 +370,7 @@ export const WorkerClientDashboardPage: React.FC = () => {
                           <TableHead>Employer</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Score</TableHead>
-                          <TableHead className="text-right">
-                            Actions
-                          </TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -431,9 +409,7 @@ export const WorkerClientDashboardPage: React.FC = () => {
                                     size="icon"
                                     className="h-8 w-8 text-emerald-400"
                                     disabled={applyMutation.isPending}
-                                    onClick={() =>
-                                      applyMutation.mutate(job.id)
-                                    }
+                                    onClick={() => applyMutation.mutate(job.id)}
                                   >
                                     <CheckCircle2 className="h-4 w-4" />
                                     <span className="sr-only">
@@ -448,9 +424,7 @@ export const WorkerClientDashboardPage: React.FC = () => {
                                     size="icon"
                                     className="h-8 w-8 text-rose-400"
                                     disabled={skipMutation.isPending}
-                                    onClick={() =>
-                                      skipMutation.mutate(job.id)
-                                    }
+                                    onClick={() => skipMutation.mutate(job.id)}
                                   >
                                     <CheckCircle2 className="h-4 w-4 rotate-45" />
                                     <span className="sr-only">Skip</span>

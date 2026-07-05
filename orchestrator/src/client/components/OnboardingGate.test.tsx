@@ -6,6 +6,10 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OnboardingGate } from "./OnboardingGate";
 
+vi.mock("@client/lib/jwt", () => ({
+  isAdminFromToken: () => true,
+}));
+
 vi.mock("@client/api", () => ({
   getAuthBootstrapStatus: vi.fn(async () => ({ setupRequired: false })),
 }));

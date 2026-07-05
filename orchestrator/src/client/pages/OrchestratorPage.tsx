@@ -101,8 +101,6 @@ export const OrchestratorPage: React.FC = () => {
   return (
     <>
       <OrchestratorHeader
-        navOpen={ui.navOpen}
-        onNavOpenChange={ui.setNavOpen}
         isPipelineRunning={isPipelineRunning}
         isCancelling={isCancelling}
         pipelineSources={pipelineSources}

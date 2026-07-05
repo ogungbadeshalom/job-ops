@@ -1,4 +1,4 @@
-import { PageHeader, PageMain, EmptyState } from "@client/components/layout";
+import { EmptyState, PageHeader, PageMain } from "@client/components/layout";
 import { showErrorToast } from "@client/lib/error-toast";
 import { queryKeys } from "@client/lib/queryKeys";
 import { useQuery } from "@tanstack/react-query";
@@ -7,17 +7,15 @@ import type React from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import * as agencyApi from "../../api/agency";
 
 const statusTokens: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+  }
 > = {
   active: { label: "Active", variant: "default" },
   inactive: { label: "Inactive", variant: "secondary" },
@@ -119,9 +117,7 @@ export const WorkerClientsPage: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
-                          navigate(`/agency/clients/${client.id}`)
-                        }
+                        onClick={() => navigate(`/agency/clients/${client.id}`)}
                       >
                         View
                         <ChevronRight className="ml-1 h-4 w-4" />

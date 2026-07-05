@@ -55,7 +55,11 @@ export const AdminClientNewPage: React.FC = () => {
   return (
     <div className="mx-auto max-w-xl px-4 py-6">
       <div className="mb-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/admin/clients")}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate("/admin/clients")}
+        >
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to Clients
         </Button>
@@ -145,7 +149,10 @@ export const AdminClientNewPage: React.FC = () => {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isPending || !name.trim() || !email.trim()}>
+          <Button
+            type="submit"
+            disabled={isPending || !name.trim() || !email.trim()}
+          >
             {isPending ? "Creating..." : "Create Client"}
           </Button>
         </div>

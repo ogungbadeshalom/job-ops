@@ -3,7 +3,7 @@
  */
 
 import { type LucideIcon, Menu } from "lucide-react";
-import React from "react";
+import type React from "react";
 import { useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,13 +36,26 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
 }) => {
   const location = useLocation();
   const { toggle } = useSidebar();
-  const hidden = location.pathname === "/sign-in" || location.pathname === "/onboarding" || location.pathname === "/offline";
+  const hidden =
+    location.pathname === "/sign-in" ||
+    location.pathname === "/onboarding" ||
+    location.pathname === "/offline";
 
   return (
-    <header className={cn("sticky top-0 z-30 border-b bg-background/80 backdrop-blur", "lg:ml-64")}>
+    <header
+      className={cn(
+        "sticky top-0 z-30 border-b bg-background/80 backdrop-blur",
+        "lg:ml-64",
+      )}
+    >
       <div className="flex items-center gap-3 px-4 py-3">
         {!hidden && (
-          <Button variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={toggle}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden shrink-0"
+            onClick={toggle}
+          >
             <Menu className="h-5 w-5" />
           </Button>
         )}
@@ -52,15 +65,21 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           </div>
           <div className="min-w-0">
             <div className="text-sm font-semibold truncate">{title}</div>
-            <div className="text-xs text-muted-foreground truncate">{subtitle}</div>
+            <div className="text-xs text-muted-foreground truncate">
+              {subtitle}
+            </div>
           </div>
           {badge && (
-            <Badge variant="outline" className="shrink-0">{badge}</Badge>
+            <Badge variant="outline" className="shrink-0">
+              {badge}
+            </Badge>
           )}
           {statusIndicator}
         </div>
         {actions && (
-          <div className="flex items-center gap-2 ml-auto shrink-0">{actions}</div>
+          <div className="flex items-center gap-2 ml-auto shrink-0">
+            {actions}
+          </div>
         )}
       </div>
     </header>

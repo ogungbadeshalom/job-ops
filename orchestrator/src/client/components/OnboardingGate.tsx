@@ -1,9 +1,10 @@
 import { useOnboardingStatus } from "@client/hooks/useOnboardingStatus";
-import React, { useEffect, useState } from "react";
+import { isAdminFromToken } from "@client/lib/jwt";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getAuthBootstrapStatus } from "@/client/api";
 import { useSettings } from "@/client/hooks/useSettings";
-import { isAdminFromToken } from "@client/lib/jwt";
 
 export const OnboardingGate: React.FC = () => {
   const location = useLocation();

@@ -1,10 +1,5 @@
 import { logout } from "@client/api";
-import {
-  ExternalLink,
-  LogOut,
-  Menu,
-  UserRound,
-} from "lucide-react";
+import { ExternalLink, LogOut, Menu, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -22,13 +17,17 @@ import {
   loadRememberedAuthUsers,
   type RememberedAuthUser,
 } from "../lib/remembered-auth-users";
-import { isNavActive, getNavLinks } from "./navigation";
+import { getNavLinks, isNavActive } from "./navigation";
 import { Tip } from "./Tip";
 
 const buildSignInPath = (username: string, nextPath: string): string => {
   const params = new URLSearchParams();
   params.set("user", username);
-  if (nextPath && nextPath !== "/sign-in" && !nextPath.startsWith("/sign-in?")) {
+  if (
+    nextPath &&
+    nextPath !== "/sign-in" &&
+    !nextPath.startsWith("/sign-in?")
+  ) {
     params.set("next", nextPath);
   }
   return `/sign-in?${params.toString()}`;
@@ -61,7 +60,10 @@ export const DesktopSidebar: React.FC = () => {
   };
 
   const navLinks = getNavLinks();
-  const isHidden = location.pathname === "/sign-in" || location.pathname === "/onboarding" || location.pathname === "/offline";
+  const isHidden =
+    location.pathname === "/sign-in" ||
+    location.pathname === "/onboarding" ||
+    location.pathname === "/offline";
 
   if (isHidden) return null;
 
@@ -94,7 +96,12 @@ export const DesktopSidebar: React.FC = () => {
       <div className="border-t p-3 space-y-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline" size="sm" className="h-8 w-full justify-start gap-2 px-2 text-xs">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-full justify-start gap-2 px-2 text-xs"
+            >
               <UserRound className="h-3.5 w-3.5" />
               <span>Account</span>
             </Button>
@@ -103,26 +110,46 @@ export const DesktopSidebar: React.FC = () => {
             <DropdownMenuLabel>Remembered</DropdownMenuLabel>
             {rememberedUsers.length > 0 ? (
               rememberedUsers.map((user) => (
-                <DropdownMenuItem key={user.username} onSelect={() => void handleRememberedUserClick(user.username)} className="flex min-w-0 items-start gap-2">
+                <DropdownMenuItem
+                  key={user.username}
+                  onSelect={() => void handleRememberedUserClick(user.username)}
+                  className="flex min-w-0 items-start gap-2"
+                >
                   <UserRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="min-w-0">
-                    <span className="block truncate font-medium">{user.displayName ?? user.username}</span>
-                    {user.displayName ? <span className="block truncate text-xs text-muted-foreground">{user.username}</span> : null}
+                    <span className="block truncate font-medium">
+                      {user.displayName ?? user.username}
+                    </span>
+                    {user.displayName ? (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {user.username}
+                      </span>
+                    ) : null}
                   </span>
                 </DropdownMenuItem>
               ))
             ) : (
-              <DropdownMenuItem disabled>Sign in once to remember a username here.</DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                Sign in once to remember a username here.
+              </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void handleSignOut()} className="gap-2">
+            <DropdownMenuItem
+              onSelect={() => void handleSignOut()}
+              className="gap-2"
+            >
               <LogOut className="h-3.5 w-3.5" />
               <span>Sign out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="flex flex-col items-start gap-2">
-          <a href="https://github.com/DaKheera47/job-ops/releases" target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
+          <a
+            href="https://github.com/DaKheera47/job-ops/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
             <span className="truncate">Version {version}</span>
             {updateAvailable && (
               <Tip asChild content={<p>Update available</p>}>
@@ -130,7 +157,15 @@ export const DesktopSidebar: React.FC = () => {
               </Tip>
             )}
           </a>
-          <Button type="button" variant="outline" size="sm" onClick={() => window.open("/docs", "_blank", "noopener,noreferrer")} className="h-7 gap-1.5 px-2 text-xs">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              window.open("/docs", "_blank", "noopener,noreferrer")
+            }
+            className="h-7 gap-1.5 px-2 text-xs"
+          >
             <span>Docs</span>
             <ExternalLink className="h-3.5 w-3.5" />
           </Button>

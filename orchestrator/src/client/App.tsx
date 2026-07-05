@@ -15,19 +15,27 @@ import { CSSTransition, SwitchTransition } from "react-transition-group";
 
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-import { AuthGuard } from "./components/AuthGuard";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppSidebar } from "./components/AppSidebar";
+import { AuthGuard } from "./components/AuthGuard";
 import { OnboardingGate } from "./components/OnboardingGate";
 import { SidebarProvider, useSidebar } from "./components/SidebarContext";
-import { AppErrorBoundary } from "./components/AppErrorBoundary";
 
 const AppSidebarWrapper: React.FC = () => {
   const { open, setOpen } = useSidebar();
   return <AppSidebar open={open} onClose={() => setOpen(false)} />;
 };
+
 import { useAnalyticsIdentity } from "./hooks/useAnalyticsIdentity";
 import { useDemoInfo } from "./hooks/useDemoInfo";
 import { setAuthNavigator } from "./lib/auth-navigation";
+import { AdminClientEditPage } from "./pages/admin/AdminClientEditPage";
+import { AdminClientNewPage } from "./pages/admin/AdminClientNewPage";
+import { AdminClientsPage } from "./pages/admin/AdminClientsPage";
+import { AdminOverviewPage } from "./pages/admin/AdminOverviewPage";
+import { AdminWorkersPage } from "./pages/admin/AdminWorkersPage";
+import { WorkerClientDashboardPage } from "./pages/agency/WorkerClientDashboardPage";
+import { WorkerClientsPage } from "./pages/agency/WorkerClientsPage";
 import { MyJobDetailPage } from "./pages/client/MyJobDetailPage";
 import { MyJobsPage } from "./pages/client/MyJobsPage";
 import { DesignResumePage } from "./pages/DesignResumePage";
@@ -44,12 +52,6 @@ import { TracerLinksPage } from "./pages/TracerLinksPage";
 import { TrackingInboxPage } from "./pages/TrackingInboxPage";
 import { VisaSponsorsPage } from "./pages/VisaSponsorsPage";
 import { WatchlistPage } from "./pages/WatchlistPage";
-import { WorkerClientsPage } from "./pages/agency/WorkerClientsPage";
-import { WorkerClientDashboardPage } from "./pages/agency/WorkerClientDashboardPage";
-import { AdminClientsPage } from "./pages/admin/AdminClientsPage";
-import { AdminClientEditPage } from "./pages/admin/AdminClientEditPage";
-import { AdminClientNewPage } from "./pages/admin/AdminClientNewPage";
-import { AdminWorkersPage } from "./pages/admin/AdminWorkersPage";
 
 /** Backwards-compatibility redirects: old URL paths -> new URL paths */
 const REDIRECTS: Array<{ from: string; to: string }> = [
@@ -122,126 +124,193 @@ export const App: React.FC = () => {
       <OnboardingGate />
       <AppSidebarWrapper />
       <div className="lg:ml-64">
-      {showDemoBanners && (
-        <div className="sticky top-0 z-50 w-full border-b border-amber-400/50 bg-amber-500/20 px-4 py-2 text-xs text-amber-100 shadow-sm backdrop-blur">
-          <div className="mx-auto flex items-center justify-center gap-3">
-            <p className="flex-1 text-center">
-              <span className="font-medium">
-                Demo mode: integrations are simulated and data resets every{" "}
-                {demoInfo.resetCadenceHours} hours.
-              </span>
+        {showDemoBanners && (
+          <div className="sticky top-0 z-50 w-full border-b border-amber-400/50 bg-amber-500/20 px-4 py-2 text-xs text-amber-100 shadow-sm backdrop-blur">
+            <div className="mx-auto flex items-center justify-center gap-3">
+              <p className="flex-1 text-center">
+                <span className="font-medium">
+                  Demo mode: integrations are simulated and data resets every{" "}
+                  {demoInfo.resetCadenceHours} hours.
+                </span>
+                {!demoWaitlistBannerDismissed && (
+                  <>
+                    {" "}
+                    This is a read-only demo. Want JobOps without the Docker
+                    setup?{" "}
+                    <a
+                      className="font-semibold underline underline-offset-2 hover:text-amber-50"
+                      href="https://try.jobops.app?utm_source=demo&utm_medium=banner&utm_campaign=waitlist"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Join the waitlist.
+                    </a>
+                  </>
+                )}
+              </p>
               {!demoWaitlistBannerDismissed && (
-                <>
-                  {" "}
-                  This is a read-only demo. Want JobOps without the Docker
-                  setup?{" "}
-                  <a
-                    className="font-semibold underline underline-offset-2 hover:text-amber-50"
-                    href="https://try.jobops.app?utm_source=demo&utm_medium=banner&utm_campaign=waitlist"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Join the waitlist.
-                  </a>
-                </>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0 rounded-full text-amber-100 hover:bg-amber-400/20 hover:text-amber-50"
+                  onClick={() => {
+                    setDemoWaitlistBannerDismissed(true);
+                    try {
+                      localStorage.setItem(
+                        DEMO_WAITLIST_BANNER_DISMISSED_KEY,
+                        "1",
+                      );
+                    } catch {
+                      // Ignore storage errors in restricted browser contexts.
+                    }
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Dismiss demo waitlist banner</span>
+                </Button>
               )}
-            </p>
-            {!demoWaitlistBannerDismissed && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0 rounded-full text-amber-100 hover:bg-amber-400/20 hover:text-amber-50"
-                onClick={() => {
-                  setDemoWaitlistBannerDismissed(true);
-                  try {
-                    localStorage.setItem(
-                      DEMO_WAITLIST_BANNER_DISMISSED_KEY,
-                      "1",
-                    );
-                  } catch {
-                    // Ignore storage errors in restricted browser contexts.
-                  }
-                }}
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Dismiss demo waitlist banner</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-      <div>
-        <SwitchTransition mode="out-in">
-          <CSSTransition
-            key={pageKey}
-            nodeRef={nodeRef}
-            timeout={100}
-            classNames="page"
-            unmountOnExit
-          >
-            <div ref={nodeRef}>
-              <AppErrorBoundary>
-                <Routes location={location}>
-                  {/* Backwards-compatibility redirects */}
-                  {REDIRECTS.map(({ from, to }) => (
-                    <Route
-                      key={from}
-                      path={from}
-                      element={<Navigate to={to} replace />}
-                    />
-                  ))}
-
-                  {/* Application routes */}
-                  <Route path="/overview" element={<HomePage />} />
-                  <Route
-                    path="/oauth/gmail/callback"
-                    element={<GmailOauthCallbackPage />}
-                  />
-                  <Route path="/job/:id" element={<JobPage />} />
-                  <Route path="/job/:id/:view" element={<JobPage />} />
-                  <Route
-                    path="/applications/in-progress"
-                    element={<InProgressBoardPage />}
-                  />
-                  <Route path="/design-resume" element={<DesignResumePage />} />
-                  <Route
-                    path="/design-resume/:section"
-                    element={<DesignResumePage />}
-                  />
-                  <Route path="/onboarding" element={<OnboardingPage />} />
-                  <Route path="/offline" element={<OfflinePage />} />
-                  <Route path="/sign-in" element={<SignInPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/tracer-links" element={<TracerLinksPage />} />
-                  <Route path="/visa-sponsors" element={<VisaSponsorsPage />} />
-                  <Route path="/tracking-inbox" element={<TrackingInboxPage />} />
-                  <Route path="/watchlist" element={<WatchlistPage />} />
-                  <Route
-                    path="/agency/clients"
-                    element={<AuthGuard><WorkerClientsPage /></AuthGuard>}
-                  />
-                  <Route
-                    path="/agency/clients/:id"
-                    element={<AuthGuard><WorkerClientDashboardPage /></AuthGuard>}
-                  />
-                  <Route path="/admin/clients" element={<AuthGuard requiredRole="admin"><AdminClientsPage /></AuthGuard>} />
-                  <Route path="/admin/clients/new" element={<AuthGuard requiredRole="admin"><AdminClientNewPage /></AuthGuard>} />
-                  <Route path="/admin/clients/:id" element={<AuthGuard requiredRole="admin"><AdminClientEditPage /></AuthGuard>} />
-                  <Route path="/admin/workers" element={<AuthGuard requiredRole="admin"><AdminWorkersPage /></AuthGuard>} />
-                  <Route path="/my-jobs" element={<AuthGuard><MyJobsPage /></AuthGuard>} />
-                  <Route path="/my-jobs/:id" element={<AuthGuard><MyJobDetailPage /></AuthGuard>} />
-                  <Route path="/jobs/:tab" element={<OrchestratorPage />} />
-                  <Route
-                    path="/jobs/:tab/:jobId"
-                    element={<OrchestratorPage />}
-                  />
-                </Routes>
-              </AppErrorBoundary>
             </div>
-          </CSSTransition>
-        </SwitchTransition>
-      </div>
+          </div>
+        )}
+        <div>
+          <SwitchTransition mode="out-in">
+            <CSSTransition
+              key={pageKey}
+              nodeRef={nodeRef}
+              timeout={100}
+              classNames="page"
+              unmountOnExit
+            >
+              <div ref={nodeRef}>
+                <AppErrorBoundary>
+                  <Routes location={location}>
+                    {/* Backwards-compatibility redirects */}
+                    {REDIRECTS.map(({ from, to }) => (
+                      <Route
+                        key={from}
+                        path={from}
+                        element={<Navigate to={to} replace />}
+                      />
+                    ))}
+
+                    {/* Application routes */}
+                    <Route path="/overview" element={<HomePage />} />
+                    <Route
+                      path="/oauth/gmail/callback"
+                      element={<GmailOauthCallbackPage />}
+                    />
+                    <Route path="/job/:id" element={<JobPage />} />
+                    <Route path="/job/:id/:view" element={<JobPage />} />
+                    <Route
+                      path="/applications/in-progress"
+                      element={<InProgressBoardPage />}
+                    />
+                    <Route
+                      path="/design-resume"
+                      element={<DesignResumePage />}
+                    />
+                    <Route
+                      path="/design-resume/:section"
+                      element={<DesignResumePage />}
+                    />
+                    <Route path="/onboarding" element={<OnboardingPage />} />
+                    <Route path="/offline" element={<OfflinePage />} />
+                    <Route path="/sign-in" element={<SignInPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/tracer-links" element={<TracerLinksPage />} />
+                    <Route
+                      path="/visa-sponsors"
+                      element={<VisaSponsorsPage />}
+                    />
+                    <Route
+                      path="/tracking-inbox"
+                      element={<TrackingInboxPage />}
+                    />
+                    <Route path="/watchlist" element={<WatchlistPage />} />
+                    <Route
+                      path="/agency/clients"
+                      element={
+                        <AuthGuard>
+                          <WorkerClientsPage />
+                        </AuthGuard>
+                      }
+                    />
+                    <Route
+                      path="/agency/clients/:id"
+                      element={
+                        <AuthGuard>
+                          <WorkerClientDashboardPage />
+                        </AuthGuard>
+                      }
+                    />
+                    <Route
+                      path="/admin"
+                      element={
+                        <AuthGuard requiredRole="admin">
+                          <AdminOverviewPage />
+                        </AuthGuard>
+                      }
+                    />
+                    <Route
+                      path="/admin/clients"
+                      element={
+                        <AuthGuard requiredRole="admin">
+                          <AdminClientsPage />
+                        </AuthGuard>
+                      }
+                    />
+                    <Route
+                      path="/admin/clients/new"
+                      element={
+                        <AuthGuard requiredRole="admin">
+                          <AdminClientNewPage />
+                        </AuthGuard>
+                      }
+                    />
+                    <Route
+                      path="/admin/clients/:id"
+                      element={
+                        <AuthGuard requiredRole="admin">
+                          <AdminClientEditPage />
+                        </AuthGuard>
+                      }
+                    />
+                    <Route
+                      path="/admin/workers"
+                      element={
+                        <AuthGuard requiredRole="admin">
+                          <AdminWorkersPage />
+                        </AuthGuard>
+                      }
+                    />
+                  <Route
+                    path="/my-jobs"
+                    element={
+                      <AuthGuard requiredRole="client">
+                        <MyJobsPage />
+                      </AuthGuard>
+                    }
+                  />
+                  <Route
+                    path="/my-jobs/:id"
+                    element={
+                      <AuthGuard requiredRole="client">
+                        <MyJobDetailPage />
+                      </AuthGuard>
+                    }
+                  />
+                    <Route path="/jobs/:tab" element={<OrchestratorPage />} />
+                    <Route
+                      path="/jobs/:tab/:jobId"
+                      element={<OrchestratorPage />}
+                    />
+                  </Routes>
+                </AppErrorBoundary>
+              </div>
+            </CSSTransition>
+          </SwitchTransition>
+        </div>
       </div>
 
       <Toaster position="bottom-right" richColors closeButton />

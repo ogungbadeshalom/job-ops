@@ -1,10 +1,10 @@
+import { getCachedAuthHeader } from "@client/api/auth-session";
 import {
   useClientJob,
   useClientJobStageEvents,
 } from "@client/hooks/useClientJob";
-import { getCachedAuthHeader } from "@client/api/auth-session";
-import { STAGE_LABELS } from "@shared/types";
 import type { StageEvent } from "@shared/types";
+import { STAGE_LABELS } from "@shared/types";
 import {
   ArrowLeft,
   Building2,
@@ -17,18 +17,12 @@ import type React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobStatusBadge } from "../orchestrator/JobStatusBadge";
 
 function formatDate(ts: number | string | null): string {
   if (!ts) return "";
-  const date =
-    typeof ts === "number" ? new Date(ts * 1000) : new Date(ts);
+  const date = typeof ts === "number" ? new Date(ts * 1000) : new Date(ts);
   return date.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
@@ -162,9 +156,7 @@ export const MyJobDetailPage: React.FC = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">
-                Application Timeline
-              </CardTitle>
+              <CardTitle className="text-base">Application Timeline</CardTitle>
             </CardHeader>
             <CardContent>
               {eventsLoading ? (
@@ -218,7 +210,9 @@ export const MyJobDetailPage: React.FC = () => {
               </div>
               {job.location && (
                 <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Location</span>
+                  <span className="text-xs text-muted-foreground">
+                    Location
+                  </span>
                   <p className="text-sm">{job.location}</p>
                 </div>
               )}
@@ -230,7 +224,9 @@ export const MyJobDetailPage: React.FC = () => {
               )}
               {job.deadline && (
                 <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Deadline</span>
+                  <span className="text-xs text-muted-foreground">
+                    Deadline
+                  </span>
                   <p className="text-sm">{formatDate(job.deadline)}</p>
                 </div>
               )}
@@ -245,10 +241,7 @@ export const MyJobDetailPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Button
-            className="w-full gap-2"
-            onClick={handleDownloadCv}
-          >
+          <Button className="w-full gap-2" onClick={handleDownloadCv}>
             <Download className="h-4 w-4" />
             Download CV
           </Button>

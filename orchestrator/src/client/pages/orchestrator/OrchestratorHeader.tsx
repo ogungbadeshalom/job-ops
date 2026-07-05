@@ -18,8 +18,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface OrchestratorHeaderProps {
-  navOpen: boolean;
-  onNavOpenChange: (open: boolean) => void;
   isPipelineRunning: boolean;
   isCancelling: boolean;
   pipelineSources: JobSource[];
@@ -31,8 +29,6 @@ interface OrchestratorHeaderProps {
 }
 
 export const OrchestratorHeader: React.FC<OrchestratorHeaderProps> = ({
-  navOpen,
-  onNavOpenChange,
   isPipelineRunning,
   isCancelling,
   pipelineSources,
@@ -112,8 +108,6 @@ export const OrchestratorHeader: React.FC<OrchestratorHeaderProps> = ({
       )}
       title="Job Ops"
       subtitle="Orchestrator"
-      navOpen={navOpen}
-      onNavOpenChange={onNavOpenChange}
       statusIndicator={
         isPipelineRunning ? (
           <StatusIndicator label="Search running" variant="amber" />

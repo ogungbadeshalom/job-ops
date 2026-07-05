@@ -3,14 +3,20 @@ import { createClientLogin } from "@client/api/agency";
 import { PageHeader } from "@client/components/layout";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Key, Save, UserCog, X } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useQueryErrorToast } from "@/client/hooks/useQueryErrorToast";
 import { showErrorToast } from "@/client/lib/error-toast";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,12 +30,6 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
-const CLIENT_STATUS_BADGE: Record<string, "default" | "secondary" | "destructive"> = {
-  active: "default",
-  inactive: "secondary",
-  archived: "destructive",
-};
-
 export const AdminClientEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -42,14 +42,20 @@ export const AdminClientEditPage: React.FC = () => {
   const [searchTermsInput, setSearchTermsInput] = useState("");
   const [enableTailoring, setEnableTailoring] = useState(true);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
-  const [currentAssignmentId, setCurrentAssignmentId] = useState<string | null>(null);
+  const [currentAssignmentId, setCurrentAssignmentId] = useState<string | null>(
+    null,
+  );
 
   const [loginCredentials, setLoginCredentials] = useState<{
     username: string;
     password: string;
   } | null>(null);
 
-  const { data: client, isLoading, error } = useQuery({
+  const {
+    data: client,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["clients", id],
     queryFn: () => api.fetchClient(id!),
     enabled: Boolean(id),
@@ -121,11 +127,9 @@ export const AdminClientEditPage: React.FC = () => {
   });
 
   const assignMutation = useMutation({
-    mutationFn: () => {
-      if (!selectedWorkerId) {
-        return Promise.resolve();
-      }
-      return api.assignWorker(selectedWorkerId, id!);
+    mutationFn: async () => {
+      if (!selectedWorkerId) return;
+      await api.assignWorker(selectedWorkerId, id!);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["assignments"] });
@@ -169,7 +173,8 @@ export const AdminClientEditPage: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const workerChanged = selectedWorkerId !== (client?.assignedWorkerId ?? null);
+      const workerChanged =
+        selectedWorkerId !== (client?.assignedWorkerId ?? null);
       await updateMutation.mutateAsync();
 
       if (workerChanged) {
@@ -191,7 +196,10 @@ export const AdminClientEditPage: React.FC = () => {
     removeAssignmentMutation.mutate();
   };
 
-  const isSaving = updateMutation.isPending || assignMutation.isPending || removeAssignmentMutation.isPending;
+  const isSaving =
+    updateMutation.isPending ||
+    assignMutation.isPending ||
+    removeAssignmentMutation.isPending;
 
   if (!id) {
     return (
@@ -223,17 +231,13 @@ export const AdminClientEditPage: React.FC = () => {
         icon={UserCog}
         title={client.name}
         subtitle="Edit client details and assignment"
-        badge={
-          <Badge
-            variant={
-              CLIENT_STATUS_BADGE[client.status] ?? "default"
-            }
-          >
-            {client.status}
-          </Badge>
-        }
+        badge={client.status}
         actions={
-          <Button variant="ghost" size="sm" onClick={() => navigate("/admin/clients")}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/admin/clients")}
+          >
             <ArrowLeft className="mr-1 h-4 w-4" />
             Back
           </Button>
@@ -351,8 +355,12 @@ export const AdminClientEditPage: React.FC = () => {
           {currentAssignmentId && client.assignedWorkerName ? (
             <div className="flex items-center justify-between rounded-md border border-border p-3">
               <div>
-                <span className="text-sm font-medium">{client.assignedWorkerName}</span>
-                <p className="text-xs text-muted-foreground">Currently assigned</p>
+                <span className="text-sm font-medium">
+                  {client.assignedWorkerName}
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  Currently assigned
+                </p>
               </div>
               <Button
                 type="button"
@@ -411,11 +419,15 @@ export const AdminClientEditPage: React.FC = () => {
               <CardContent className="space-y-1 text-sm">
                 <div>
                   <span className="font-medium">Username:</span>{" "}
-                  <code className="rounded bg-green-200 px-1 dark:bg-green-800">{loginCredentials.username}</code>
+                  <code className="rounded bg-green-200 px-1 dark:bg-green-800">
+                    {loginCredentials.username}
+                  </code>
                 </div>
                 <div>
                   <span className="font-medium">Password:</span>{" "}
-                  <code className="rounded bg-green-200 px-1 dark:bg-green-800">{loginCredentials.password}</code>
+                  <code className="rounded bg-green-200 px-1 dark:bg-green-800">
+                    {loginCredentials.password}
+                  </code>
                 </div>
               </CardContent>
             </Card>
@@ -424,7 +436,8 @@ export const AdminClientEditPage: React.FC = () => {
               <div>
                 <span className="text-sm font-medium">Login exists</span>
                 <p className="text-xs text-muted-foreground">
-                  Client can sign in at /sign-in. Regenerate to reset credentials.
+                  Client can sign in at /sign-in. Regenerate to reset
+                  credentials.
                 </p>
               </div>
               <Button
@@ -432,13 +445,20 @@ export const AdminClientEditPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  if (!window.confirm("Regenerate client credentials? The old credentials will be invalidated.")) return;
+                  if (
+                    !window.confirm(
+                      "Regenerate client credentials? The old credentials will be invalidated.",
+                    )
+                  )
+                    return;
                   createLoginMutation.mutate();
                 }}
                 disabled={createLoginMutation.isPending}
               >
                 <Key className="mr-1 h-4 w-4" />
-                {createLoginMutation.isPending ? "Regenerating..." : "Regenerate"}
+                {createLoginMutation.isPending
+                  ? "Regenerating..."
+                  : "Regenerate"}
               </Button>
             </div>
           ) : (
@@ -472,7 +492,10 @@ export const AdminClientEditPage: React.FC = () => {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSaving || !name.trim() || !email.trim()}>
+          <Button
+            type="submit"
+            disabled={isSaving || !name.trim() || !email.trim()}
+          >
             <Save className="mr-1 h-4 w-4" />
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>

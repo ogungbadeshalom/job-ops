@@ -1,3 +1,4 @@
+import { getRoleFromToken, isAdminFromToken } from "@client/lib/jwt";
 import {
   Building2,
   Columns3,
@@ -8,7 +9,6 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
-import { getRoleFromToken, isAdminFromToken } from "@client/lib/jwt";
 
 export type NavLink = {
   to: string;
@@ -44,6 +44,12 @@ const AGENCY_NAV: NavLink[] = [
 ];
 
 const ADMIN_NAV: NavLink[] = [
+  {
+    to: "/admin",
+    label: "Overview",
+    icon: Home,
+    activePaths: [],
+  },
   {
     to: "/admin/clients",
     label: "Clients",

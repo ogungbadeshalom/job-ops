@@ -52,8 +52,6 @@ const renderHeader = (
   overrides: Partial<React.ComponentProps<typeof OrchestratorHeader>> = {},
 ) => {
   const props: React.ComponentProps<typeof OrchestratorHeader> = {
-    navOpen: false,
-    onNavOpenChange: vi.fn(),
     isPipelineRunning: false,
     isCancelling: false,
     pipelineSources: ["gradcracker"],

@@ -2,7 +2,8 @@ import * as api from "@client/api";
 import { PageHeader } from "@client/components/layout";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { UserCheck, UserPlus, Users } from "lucide-react";
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useQueryErrorToast } from "@/client/hooks/useQueryErrorToast";
 import { showErrorToast } from "@/client/lib/error-toast";
@@ -27,7 +28,11 @@ export const AdminWorkersPage: React.FC = () => {
   const [password, setPassword] = useState("");
   const [isSystemAdmin, setIsSystemAdmin] = useState(false);
 
-  const { data: users = [], isLoading, error } = useQuery({
+  const {
+    data: users = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["workspaces", "users"],
     queryFn: api.fetchUsers,
   });
@@ -38,6 +43,7 @@ export const AdminWorkersPage: React.FC = () => {
       password: string;
       displayName: string;
       isSystemAdmin: boolean;
+      role: "owner" | "member" | "worker" | "client" | "admin";
     }) => api.createWorkspaceUser(input),
     onSuccess: async () => {
       setUsername("");
@@ -77,6 +83,7 @@ export const AdminWorkersPage: React.FC = () => {
       displayName: displayName.trim() || username.trim(),
       password,
       isSystemAdmin,
+      role: "worker",
     });
   };
 
@@ -229,7 +236,7 @@ export const AdminWorkersPage: React.FC = () => {
                         disableUserMutation.mutate({
                           userId: user.id,
                           isDisabled: !user.isDisabled,
-                        })
+                        });
                       }}
                     >
                       {user.isDisabled ? "Enable" : "Disable"}

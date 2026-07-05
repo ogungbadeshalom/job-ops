@@ -1,7 +1,5 @@
-import * as api from "@client/api";
 import { useClientJobs } from "@client/hooks/useClientJob";
 import type { Job, JobStatus } from "@shared/types";
-import { useQuery } from "@tanstack/react-query";
 import {
   BriefcaseBusiness,
   CheckCircle2,
@@ -14,12 +12,7 @@ import type React from "react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobStatusBadge } from "../orchestrator/JobStatusBadge";
 
 const statusTokens: Record<string, { label: string; className: string }> = {
@@ -62,17 +55,11 @@ function getScoreColor(score: number): string {
 export const MyJobsPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const { data: authContext } = useQuery({
-    queryKey: ["auth", "me"],
-    queryFn: () => api.getCurrentAuthContext(),
-    staleTime: 60_000,
-  });
-
-  const clientId = authContext?.user.id;
-  const { data: jobsResponse, isLoading } = useClientJobs(clientId);
+  const { data: jobsResponse, isLoading } = useClientJobs();
 
   const stats = useMemo(() => {
-    const byStatus = jobsResponse?.byStatus ?? ({} as Record<JobStatus, number>);
+    const byStatus =
+      jobsResponse?.byStatus ?? ({} as Record<JobStatus, number>);
     const total = jobsResponse?.total ?? 0;
     const applied = (byStatus.applied ?? 0) + (byStatus.in_progress ?? 0);
 
@@ -120,9 +107,7 @@ export const MyJobsPage: React.FC = () => {
   return (
     <main className="container mx-auto space-y-6 px-4 py-6 pb-12">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          My Applications
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">My Applications</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Track the status of your job applications
         </p>
@@ -161,9 +146,7 @@ export const MyJobsPage: React.FC = () => {
           {jobs.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
               <FileText className="h-10 w-10 text-muted-foreground/50" />
-              <div className="text-base font-semibold">
-                No applications yet
-              </div>
+              <div className="text-base font-semibold">No applications yet</div>
               <p className="max-w-md text-sm text-muted-foreground">
                 Your applications will appear here once submitted.
               </p>

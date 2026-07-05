@@ -2,7 +2,8 @@ import * as api from "@client/api";
 import { PageHeader } from "@client/components/layout";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, ExternalLink, Plus, Trash2 } from "lucide-react";
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useQueryErrorToast } from "@/client/hooks/useQueryErrorToast";
@@ -18,7 +19,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const STATUS_BADGE_VARIANTS: Record<string, "default" | "secondary" | "destructive"> = {
+const STATUS_BADGE_VARIANTS: Record<
+  string,
+  "default" | "secondary" | "destructive"
+> = {
   active: "default",
   inactive: "secondary",
   archived: "destructive",
@@ -29,7 +33,11 @@ export const AdminClientsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data: clients = [], isLoading, error } = useQuery({
+  const {
+    data: clients = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["clients"],
     queryFn: api.fetchClients,
   });
@@ -48,7 +56,8 @@ export const AdminClientsPage: React.FC = () => {
   useQueryErrorToast(error, "Failed to load clients");
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete client "${name}"? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete client "${name}"? This cannot be undone.`))
+      return;
     setDeletingId(id);
     try {
       await archiveMutation.mutateAsync(id);
@@ -143,7 +152,10 @@ export const AdminClientsPage: React.FC = () => {
                         size="icon"
                         className="h-8 w-8 text-destructive"
                         title="Delete client"
-                        disabled={deletingId === client.id || client.status === "archived"}
+                        disabled={
+                          deletingId === client.id ||
+                          client.status === "archived"
+                        }
                         onClick={() => handleDelete(client.id, client.name)}
                       >
                         <Trash2 className="h-4 w-4" />

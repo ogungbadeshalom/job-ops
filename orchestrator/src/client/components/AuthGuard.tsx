@@ -1,10 +1,8 @@
-import { hasAuthenticatedSession } from "@/client/api/auth-session";
-import {
-  getRoleFromToken,
-  isAdminFromToken,
-} from "@/client/lib/jwt";
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { hasAuthenticatedSession } from "@/client/api/auth-session";
+import { getRoleFromToken, isAdminFromToken } from "@/client/lib/jwt";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -54,7 +52,9 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   if (!isSignedIn) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-muted-foreground">Checking authentication...</p>
+        <p className="text-sm text-muted-foreground">
+          Checking authentication...
+        </p>
       </div>
     );
   }
@@ -62,7 +62,9 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-muted-foreground">Checking authorization...</p>
+        <p className="text-sm text-muted-foreground">
+          Checking authorization...
+        </p>
       </div>
     );
   }
