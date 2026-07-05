@@ -10,6 +10,7 @@ import { transitionStage } from "@server/services/applicationTracking";
 import { simulateApplyJob } from "@server/services/demo-simulator";
 import { notifyJobCompleteWebhook } from "@server/services/jobs/webhooks";
 import * as visaSponsors from "@server/services/visa-sponsors/index";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { type Request, type Response, Router } from "express";
 import { hydrateJobPdfFreshness, requireJob, toJobsRouteError } from "./shared";
 
@@ -19,6 +20,7 @@ jobsApplicationRouter.post(
   "/:id/check-sponsor",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       const job = await requireJob(req.params.id);
 
       if (!job.employer) {
@@ -73,6 +75,7 @@ jobsApplicationRouter.post(
   "/:id/apply",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       if (isDemoMode()) {
         const updatedJob = await simulateApplyJob(req.params.id);
         return okWithMeta(res, await hydrateJobPdfFreshness(updatedJob), {

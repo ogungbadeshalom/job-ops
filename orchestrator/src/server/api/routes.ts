@@ -3,10 +3,12 @@
  */
 
 import { Router } from "express";
+import { adminStatsRouter } from "./routes/admin/stats";
 import { appStatusRouter } from "./routes/app-status";
 import { assignmentsRouter } from "./routes/assignments";
 import { authRouter } from "./routes/auth";
 import { backupRouter } from "./routes/backup";
+import { clientCredentialsRouter } from "./routes/client-credentials";
 import { clientsRouter } from "./routes/clients";
 import { databaseRouter } from "./routes/database";
 import { demoRouter } from "./routes/demo";
@@ -49,8 +51,10 @@ apiRouter.use("/backups", backupRouter);
 apiRouter.use("/tracer-links", tracerLinksRouter);
 apiRouter.use("/workspaces", workspacesRouter);
 apiRouter.use("/clients", clientsRouter);
+apiRouter.use("/clients/:clientId/credentials", clientCredentialsRouter);
 apiRouter.use("/assignments", assignmentsRouter);
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/workday", workdayRouter);
 apiRouter.use("/watchlist", watchlistRouter);
 apiRouter.use("/", extractorHealthRouter);
+apiRouter.use("/admin", adminStatsRouter);

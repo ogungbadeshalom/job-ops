@@ -162,6 +162,7 @@ export function createAuthGuard() {
     tenantId: string;
     username: string;
     isSystemAdmin: boolean;
+    role: string;
   } | null> {
     const authHeader = req.headers.authorization || "";
     if (!authHeader.startsWith("Bearer ")) return null;
@@ -177,6 +178,7 @@ export function createAuthGuard() {
         tenantId: user.workspaceId,
         username: user.username,
         isSystemAdmin: user.isSystemAdmin,
+        role: payload.role,
       };
     } catch {
       return null;
@@ -297,6 +299,7 @@ export function createAuthGuard() {
             tenantId: DEFAULT_TENANT_ID,
             username: "test",
             isSystemAdmin: true,
+            role: "admin",
           },
           () => next(),
         );

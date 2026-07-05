@@ -1,20 +1,16 @@
-import {
-  badRequest,
-  conflict,
-  forbidden,
-  notFound,
-} from "@infra/errors";
+import { badRequest, conflict, notFound } from "@infra/errors";
 import { asyncRoute, fail, ok } from "@infra/http";
-import { isSystemAdmin } from "@infra/request-context";
+import { getClientById } from "@server/repositories/clients";
+import { getUserById } from "@server/repositories/users";
 import {
   createAssignment,
   deleteAssignment,
-  getAssignmentById,
   listAssignments,
   listAssignmentsForClient,
   listAssignmentsForWorker,
   updateAssignmentStatus,
 } from "@server/repositories/worker-assignments";
+import { requireRole } from "@server/tenancy/private-scope";
 import type { Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
@@ -26,16 +22,10 @@ const createAssignmentSchema = z.object({
   clientId: z.string().min(1),
 });
 
-function requireAdmin(res: Response): boolean {
-  if (isSystemAdmin()) return true;
-  fail(res, forbidden("Admin access is required"));
-  return false;
-}
-
 assignmentsRouter.get(
   "/",
   asyncRoute(async (req: Request, res: Response) => {
-    if (!requireAdmin(res)) return;
+    requireRole("admin", "owner");
 
     const workerId =
       typeof req.query.workerId === "string" ? req.query.workerId : undefined;
@@ -58,11 +48,24 @@ assignmentsRouter.get(
 assignmentsRouter.post(
   "/",
   asyncRoute(async (req: Request, res: Response) => {
-    if (!requireAdmin(res)) return;
+    requireRole("admin", "owner");
 
     const parsed = createAssignmentSchema.safeParse(req.body);
     if (!parsed.success) {
       fail(res, badRequest("Invalid request body", parsed.error.flatten()));
+      return;
+    }
+
+    const [worker, client] = await Promise.all([
+      getUserById(parsed.data.workerId),
+      getClientById(parsed.data.clientId),
+    ]);
+    if (!worker) {
+      fail(res, notFound("Worker not found"));
+      return;
+    }
+    if (!client) {
+      fail(res, notFound("Client not found"));
       return;
     }
 
@@ -77,10 +80,7 @@ assignmentsRouter.post(
         error instanceof Error &&
         /UNIQUE constraint failed/i.test(error.message)
       ) {
-        fail(
-          res,
-          conflict("Worker is already assigned to this client"),
-        );
+        fail(res, conflict("Worker is already assigned to this client"));
         return;
       }
       throw error;
@@ -91,7 +91,7 @@ assignmentsRouter.post(
 assignmentsRouter.patch(
   "/:id",
   asyncRoute(async (req: Request, res: Response) => {
-    if (!requireAdmin(res)) return;
+    requireRole("admin", "owner");
 
     const statusSchema = z.object({
       status: z.enum(["active", "inactive"]),
@@ -117,7 +117,7 @@ assignmentsRouter.patch(
 assignmentsRouter.delete(
   "/:id",
   asyncRoute(async (req: Request, res: Response) => {
-    if (!requireAdmin(res)) return;
+    requireRole("admin", "owner");
 
     const deleted = await deleteAssignment(req.params.id);
     if (!deleted) {

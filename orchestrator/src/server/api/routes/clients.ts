@@ -1,25 +1,27 @@
+import { randomBytes } from "node:crypto";
 import { badRequest, forbidden, notFound } from "@infra/errors";
 import { asyncRoute, fail, ok } from "@infra/http";
-import { getActiveTenantId } from "@server/tenancy/context";
+import { getRole, getUserId } from "@infra/request-context";
+import { revokeAuthSessionsForUser } from "@server/repositories/auth-sessions";
 import {
-  type NewClientRow,
   createClient,
   deleteClient,
   getClientById,
-  getClientForClientUser,
   getClientJobCount,
   getClientLoginStatus,
   listClients,
   listClientsForWorker,
+  type NewClientRow,
   setClientCreatedBy,
   updateClient,
 } from "@server/repositories/clients";
-import { createPrivateWorkspaceUser, deleteUser } from "@server/repositories/users";
-import { revokeAuthSessionsForUser } from "@server/repositories/auth-sessions";
-import { isSystemAdmin } from "@infra/request-context";
+import {
+  createPrivateWorkspaceUser,
+  deleteUser,
+} from "@server/repositories/users";
 import { isWorkerAssignedToClient } from "@server/repositories/worker-assignments";
-import { getUserId } from "@infra/request-context";
-import { randomBytes } from "node:crypto";
+import { getActiveTenantId } from "@server/tenancy/context";
+import { requireRole } from "@server/tenancy/private-scope";
 import type { Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
@@ -47,12 +49,6 @@ const updateClientSchema = z.object({
   status: z.enum(["active", "inactive", "archived"]).optional(),
 });
 
-function requireAdmin(res: Response): boolean {
-  if (isSystemAdmin()) return true;
-  fail(res, forbidden("Admin access is required"));
-  return false;
-}
-
 clientsRouter.get(
   "/",
   asyncRoute(async (_req: Request, res: Response) => {
@@ -62,7 +58,8 @@ clientsRouter.get(
       return;
     }
 
-    if (isSystemAdmin()) {
+    const role = getRole();
+    if (role === "admin" || role === "owner") {
       ok(res, { clients: await listClients() });
       return;
     }
@@ -86,7 +83,8 @@ clientsRouter.get(
       return;
     }
 
-    if (!isSystemAdmin() && client.createdBy !== userId) {
+    const role = getRole();
+    if (role !== "admin" && role !== "owner" && client.createdBy !== userId) {
       const assigned = await isWorkerAssignedToClient(userId, req.params.id);
       if (!assigned) {
         fail(res, forbidden("You are not assigned to this client"));
@@ -103,7 +101,7 @@ clientsRouter.get(
 clientsRouter.post(
   "/",
   asyncRoute(async (req: Request, res: Response) => {
-    if (!requireAdmin(res)) return;
+    requireRole("admin", "owner");
 
     const parsed = createClientSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -137,7 +135,7 @@ clientsRouter.post(
 clientsRouter.patch(
   "/:id",
   asyncRoute(async (req: Request, res: Response) => {
-    if (!requireAdmin(res)) return;
+    requireRole("admin", "owner");
 
     const parsed = updateClientSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -155,11 +153,16 @@ clientsRouter.patch(
     if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
     if (parsed.data.email !== undefined) updateData.email = parsed.data.email;
     if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
-    if (parsed.data.searchTerms !== undefined) updateData.searchTerms = JSON.stringify(parsed.data.searchTerms);
-    if (parsed.data.workplaceTypes !== undefined) updateData.workplaceTypes = JSON.stringify(parsed.data.workplaceTypes);
-    if (parsed.data.searchCities !== undefined) updateData.searchCities = JSON.stringify(parsed.data.searchCities);
-    if (parsed.data.enableTailoring !== undefined) updateData.enableTailoring = parsed.data.enableTailoring;
-    if (parsed.data.status !== undefined) updateData.status = parsed.data.status;
+    if (parsed.data.searchTerms !== undefined)
+      updateData.searchTerms = JSON.stringify(parsed.data.searchTerms);
+    if (parsed.data.workplaceTypes !== undefined)
+      updateData.workplaceTypes = JSON.stringify(parsed.data.workplaceTypes);
+    if (parsed.data.searchCities !== undefined)
+      updateData.searchCities = JSON.stringify(parsed.data.searchCities);
+    if (parsed.data.enableTailoring !== undefined)
+      updateData.enableTailoring = parsed.data.enableTailoring;
+    if (parsed.data.status !== undefined)
+      updateData.status = parsed.data.status;
 
     const client = await updateClient(req.params.id, updateData);
     if (!client) {
@@ -173,7 +176,7 @@ clientsRouter.patch(
 clientsRouter.delete(
   "/:id",
   asyncRoute(async (req: Request, res: Response) => {
-    if (!requireAdmin(res)) return;
+    requireRole("admin", "owner");
 
     const deleted = await deleteClient(req.params.id);
     if (!deleted) {
@@ -187,7 +190,7 @@ clientsRouter.delete(
 clientsRouter.post(
   "/:id/create-login",
   asyncRoute(async (req: Request, res: Response) => {
-    if (!requireAdmin(res)) return;
+    requireRole("admin", "owner");
 
     const client = await getClientById(req.params.id);
     if (!client) {
@@ -197,7 +200,8 @@ clientsRouter.post(
 
     const loginStatus = await getClientLoginStatus(req.params.id);
 
-    const emailPrefix = client.email.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "") || "client";
+    const emailPrefix =
+      client.email.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "") || "client";
     const suffix = randomBytes(4).toString("hex");
     const username = `${emailPrefix.toLowerCase()}-${suffix}`;
     const password = randomBytes(16).toString("hex");
@@ -235,6 +239,15 @@ clientsRouter.get(
     if (!client) {
       fail(res, notFound("Client not found"));
       return;
+    }
+
+    const role = getRole();
+    if (role !== "admin" && role !== "owner" && client.createdBy !== userId) {
+      const assigned = await isWorkerAssignedToClient(userId, req.params.id);
+      if (!assigned) {
+        fail(res, forbidden("You are not assigned to this client"));
+        return;
+      }
     }
 
     const stats = await getClientJobCount(req.params.id);

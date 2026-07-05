@@ -9,6 +9,7 @@ import {
   mapJobActionFailure,
 } from "@server/services/jobs/actions";
 import { resolvePdfFingerprintContext } from "@server/services/pdf-fingerprint";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { asyncPool } from "@server/utils/async-pool";
 import type { JobActionResult, JobActionStreamEvent } from "@shared/types";
 import { type Request, type Response, Router } from "express";
@@ -24,6 +25,7 @@ export const jobsActionsRouter = Router();
 
 jobsActionsRouter.post("/actions", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const parsed = jobActionRequestSchema.parse(req.body);
     const dedupedJobIds = Array.from(new Set(parsed.jobIds));
     const forceMoveToReady =
@@ -100,6 +102,11 @@ jobsActionsRouter.post("/actions", async (req: Request, res: Response) => {
 jobsActionsRouter.post(
   "/actions/stream",
   async (req: Request, res: Response) => {
+    try {
+      requireNonClientRole();
+    } catch (error) {
+      return fail(res, error as AppError);
+    }
     const parsed = jobActionRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       return fail(
@@ -289,6 +296,11 @@ jobsActionsRouter.post(
 );
 
 jobsActionsRouter.post("/:id/process", async (req: Request, res: Response) => {
+  try {
+    requireNonClientRole();
+  } catch (error) {
+    return fail(res, error as AppError);
+  }
   const forceRaw = req.query.force as string | undefined;
   const force = forceRaw === "1" || forceRaw === "true";
   const result = await executeJobActionForJob("move_to_ready", req.params.id, {
@@ -300,12 +312,22 @@ jobsActionsRouter.post("/:id/process", async (req: Request, res: Response) => {
 });
 
 jobsActionsRouter.post("/:id/skip", async (req: Request, res: Response) => {
+  try {
+    requireNonClientRole();
+  } catch (error) {
+    return fail(res, error as AppError);
+  }
   const result = await executeJobActionForJob("skip", req.params.id);
   if (!result.ok) return fail(res, mapJobActionFailure(result));
   ok(res, await hydrateJobPdfFreshness(result.job));
 });
 
 jobsActionsRouter.post("/:id/rescore", async (req: Request, res: Response) => {
+  try {
+    requireNonClientRole();
+  } catch (error) {
+    return fail(res, error as AppError);
+  }
   const result = await executeJobActionForJob(
     "rescore",
     req.params.id,

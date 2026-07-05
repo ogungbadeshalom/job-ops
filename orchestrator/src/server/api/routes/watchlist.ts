@@ -2,6 +2,7 @@ import { badRequest, toAppError, unprocessableEntity } from "@infra/errors";
 import { asyncRoute, fail, ok } from "@infra/http";
 import { listCareerBoardSources } from "@server/config/career-boards";
 import * as watchlistRepo from "@server/repositories/watchlist";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { getWatchlistSourceAdapter } from "@server/watchlist/adapters";
 import {
   getCurrentWatchlistResults,
@@ -245,6 +246,7 @@ watchlistRouter.post(
 watchlistRouter.post(
   "/checks",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const parsedBody = watchlistCheckSchema.safeParse(req.body ?? {});
     if (!parsedBody.success) {
       return fail(
@@ -263,6 +265,7 @@ watchlistRouter.post(
 watchlistRouter.put(
   "/sources",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const parsedBody = updateWatchlistSelectionsSchema.safeParse(
       req.body ?? {},
     );
@@ -377,6 +380,7 @@ watchlistRouter.put(
       {
         selections: normalizedSelections,
       },
+      null, // TODO: pass clientId from query param or session context for agency workers
     );
 
     ok(res, getWatchlistSourcesPayload(catalogSources, selectedSources));
@@ -386,6 +390,7 @@ watchlistRouter.put(
 watchlistRouter.put(
   "/states/:source/:sourceJobId",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const parsedParams = watchlistStateParamsSchema.safeParse(req.params);
     if (!parsedParams.success) {
       return fail(
@@ -409,6 +414,7 @@ watchlistRouter.put(
 watchlistRouter.delete(
   "/states/:source/:sourceJobId",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const parsedParams = watchlistStateParamsSchema.safeParse(req.params);
     if (!parsedParams.success) {
       return fail(

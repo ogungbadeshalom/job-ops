@@ -11,6 +11,7 @@ import {
   updateStageEvent,
 } from "@server/services/applicationTracking";
 import { trackApplicationAcceptedIfNeeded } from "@server/services/jobs/analytics";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { type Request, type Response, Router } from "express";
 import { z } from "zod";
 import {
@@ -24,6 +25,7 @@ export const jobsStagesRouter = Router();
 
 jobsStagesRouter.get("/:id/events", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const events = await getStageEvents(req.params.id);
     ok(res, events);
   } catch (error) {
@@ -33,6 +35,7 @@ jobsStagesRouter.get("/:id/events", async (req: Request, res: Response) => {
 
 jobsStagesRouter.get("/:id/tasks", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const includeCompleted =
       req.query.includeCompleted === "1" ||
       req.query.includeCompleted === "true";
@@ -45,6 +48,7 @@ jobsStagesRouter.get("/:id/tasks", async (req: Request, res: Response) => {
 
 jobsStagesRouter.post("/:id/stages", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const input = transitionStageSchema.parse(req.body);
     const event = transitionStage(
       req.params.id,
@@ -72,6 +76,7 @@ jobsStagesRouter.patch(
   "/:id/events/:eventId",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       const input = updateStageEventSchema.parse(req.body);
       updateStageEvent(req.params.eventId, input);
       ok(res, null);
@@ -95,6 +100,7 @@ jobsStagesRouter.delete(
   "/:id/events/:eventId",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       deleteStageEvent(req.params.eventId);
       ok(res, null);
       queueMicrotask(() => {
@@ -112,6 +118,7 @@ jobsStagesRouter.delete(
 
 jobsStagesRouter.patch("/:id/outcome", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const input = updateOutcomeSchema.parse(req.body);
     const currentJob = await jobsRepo.getJobById(req.params.id);
     if (!currentJob) {

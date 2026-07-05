@@ -1,9 +1,7 @@
 import { badRequest, notFound } from "@infra/errors";
 import { fail, ok } from "@infra/http";
 import { logger } from "@infra/logger";
-import { getUserId, isSystemAdmin } from "@infra/request-context";
 import * as jobsRepo from "@server/repositories/jobs";
-import { getAssignedClientIdsForWorker } from "@server/repositories/worker-assignments";
 import { attachAppliedDuplicateMatches } from "@server/services/applied-duplicate-matching";
 import { getPdfPath, pdfExists } from "@server/services/pdf";
 import {
@@ -65,23 +63,7 @@ jobsReadRouter.get("/", async (req: Request, res: Response) => {
     const statusFilter = parsedQuery.data.status;
     const statuses = parseStatusFilter(statusFilter);
     const view = parsedQuery.data.view ?? "list";
-    let clientId = parsedQuery.data.clientId ?? undefined;
-
-    // Security: enforce role-based clientId scoping
-    if (!isSystemAdmin()) {
-      const userId = getUserId();
-      if (!clientId && userId) {
-        // Worker without explicit clientId: scope to assigned clients only
-        const assignedClientIds = await getAssignedClientIdsForWorker(userId);
-        if (assignedClientIds.length > 0) {
-          // Pass first assigned client ID (frontend picks per-client context)
-          clientId = assignedClientIds[0];
-        } else {
-          // No assignments — return empty to prevent seeing all jobs
-          clientId = "__none__";
-        }
-      }
-    }
+    const clientId = parsedQuery.data.clientId ?? undefined;
 
     const primaryQueryStart = performance.now();
     const pdfFingerprintContext = await resolvePdfFingerprintContext();

@@ -13,6 +13,7 @@ const createUserSchema = z.object({
   password: z.string().min(8).max(500),
   displayName: z.string().trim().min(1).max(120).optional(),
   isSystemAdmin: z.boolean().optional(),
+  role: z.enum(["owner", "member", "worker", "client", "admin"]).optional(),
 });
 
 const resetPasswordSchema = z.object({
@@ -63,7 +64,8 @@ workspacesRouter.post(
         displayName: parsed.data.displayName ?? parsed.data.username,
         isSystemAdmin: parsed.data.isSystemAdmin ?? false,
         useDefaultTenant: true,
-        role: parsed.data.isSystemAdmin ? "admin" : "worker",
+        role:
+          parsed.data.role ?? (parsed.data.isSystemAdmin ? "admin" : "member"),
       });
       ok(res, { user }, 201);
       return;

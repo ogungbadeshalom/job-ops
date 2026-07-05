@@ -3,7 +3,10 @@ import { badRequest, serviceUnavailable, upstreamError } from "@infra/errors";
 import { asyncRoute, fail, ok } from "@infra/http";
 import { logger } from "@infra/logger";
 import { executePostApplicationProviderAction } from "@server/services/post-application/providers";
-import { getPrivateDataScope } from "@server/tenancy/private-scope";
+import {
+  getPrivateDataScope,
+  requireNonClientRole,
+} from "@server/tenancy/private-scope";
 import {
   POST_APPLICATION_PROVIDER_ACTIONS,
   POST_APPLICATION_PROVIDERS,
@@ -278,6 +281,7 @@ postApplicationProvidersRouter.post(
   "/providers/gmail/oauth/exchange",
   asyncRoute(async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       cleanupOauthState();
       const body = oauthExchangeBodySchema.parse(req.body ?? {});
       const accountKey = body.accountKey ?? "default";
@@ -343,6 +347,7 @@ postApplicationProvidersRouter.post(
 postApplicationProvidersRouter.post(
   "/providers/:provider/actions/:action",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     let provider: (typeof POST_APPLICATION_PROVIDERS)[number];
     let action: (typeof POST_APPLICATION_PROVIDER_ACTIONS)[number];
 

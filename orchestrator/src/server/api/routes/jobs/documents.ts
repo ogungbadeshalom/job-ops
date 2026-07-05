@@ -17,6 +17,7 @@ import {
   storeJobDocument,
 } from "@server/services/job-document-storage";
 import { uploadJobPdf } from "@server/services/job-pdf-upload";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { getSafeInlineJobDocumentMediaType } from "@shared/job-document-classification.js";
 import { type Request, type Response, Router } from "express";
 import {
@@ -109,6 +110,7 @@ jobsDocumentsRouter.post("/:id/pdf", async (req: Request, res: Response) => {
   let uploadedPath: string | null = null;
 
   try {
+    requireNonClientRole();
     const input = uploadJobPdfSchema.parse(req.body);
     const currentJob = await jobsRepo.getJobById(req.params.id);
 
@@ -249,6 +251,7 @@ jobsDocumentsRouter.post(
     let storagePath: string | null = null;
 
     try {
+      requireNonClientRole();
       const input = uploadJobDocumentSchema.parse(req.body);
       await requireJob(req.params.id);
 
@@ -360,6 +363,7 @@ jobsDocumentsRouter.delete(
   "/:id/documents/:documentId",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       await requireJob(req.params.id);
       const document = await jobDocumentsRepo.deleteJobDocumentForJob(
         req.params.id,
@@ -412,6 +416,7 @@ jobsDocumentsRouter.post(
   "/:id/summarize",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       const forceRaw = req.query.force as string | undefined;
       const force = forceRaw === "1" || forceRaw === "true";
       const fields = parseTailoringGenerateFields(
@@ -463,6 +468,7 @@ jobsDocumentsRouter.post(
   "/:id/generate-pdf",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       if (isDemoMode()) {
         const result = await simulateGeneratePdf(req.params.id);
         if (!result.success) {

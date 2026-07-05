@@ -6,6 +6,7 @@ import * as jobsRepo from "@server/repositories/jobs";
 import { reconcileActivationMilestonesFromHistorySafely } from "@server/services/activation-funnel";
 import { trackApplicationAcceptedIfNeeded } from "@server/services/jobs/analytics";
 import { getTracerReadiness } from "@server/services/tracer-links";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { type Request, type Response, Router } from "express";
 import {
   hydrateJobPdfFreshness,
@@ -19,6 +20,7 @@ export const jobsMutationsRouter = Router();
 
 jobsMutationsRouter.patch("/:id", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const input = updateJobSchema.parse(req.body);
     const currentJob = await jobsRepo.getJobById(req.params.id);
 

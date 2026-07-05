@@ -101,6 +101,7 @@ describe.sequential("Tenant isolation", () => {
       headers: { Authorization: `Bearer ${adminToken}` },
     }).then((res) => res.json());
     expect(adminList.data.jobs.map((job: { id: string }) => job.id)).toEqual([
+      adamJob.id,
       adminJob.id,
     ]);
 

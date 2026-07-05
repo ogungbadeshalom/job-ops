@@ -2,6 +2,7 @@ import { badRequest, notFound } from "@infra/errors";
 import { fail, ok } from "@infra/http";
 import { logger } from "@infra/logger";
 import * as jobsRepo from "@server/repositories/jobs";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { type Request, type Response, Router } from "express";
 import { jobNoteSchema, toJobsRouteError } from "./shared";
 
@@ -86,6 +87,7 @@ jobsNotesRouter.post("/:id/notes", async (req: Request, res: Response) => {
   const route = "POST /api/jobs/:id/notes";
 
   try {
+    requireNonClientRole();
     const input = jobNoteSchema.safeParse(req.body);
     if (!input.success) {
       return fail(
@@ -122,6 +124,7 @@ jobsNotesRouter.patch(
     const route = "PATCH /api/jobs/:id/notes/:noteId";
 
     try {
+      requireNonClientRole();
       const input = jobNoteSchema.safeParse(req.body);
       if (!input.success) {
         return fail(
@@ -178,6 +181,7 @@ jobsNotesRouter.delete(
     const route = "DELETE /api/jobs/:id/notes/:noteId";
 
     try {
+      requireNonClientRole();
       const job = await loadJobOrRespondNotFound(
         req,
         res,

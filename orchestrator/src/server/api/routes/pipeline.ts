@@ -34,8 +34,8 @@ import {
 } from "@server/pipeline/index";
 import { getClientById } from "@server/repositories/clients";
 import * as pipelineRepo from "@server/repositories/pipeline";
-import { isWorkerAssignedToClient } from "@server/repositories/worker-assignments";
 import * as pipelineSearchPresetsRepo from "@server/repositories/pipeline-search-presets";
+import { isWorkerAssignedToClient } from "@server/repositories/worker-assignments";
 import { trackCanonicalActivationEvent } from "@server/services/activation-funnel";
 import {
   buildChallengeViewerUrl,
@@ -481,10 +481,7 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
           config.clientId,
         );
         if (!assigned) {
-          return fail(
-            res,
-            forbidden("You are not assigned to this client"),
-          );
+          return fail(res, forbidden("You are not assigned to this client"));
         }
       }
 
@@ -632,7 +629,9 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
         top_n: config.topN,
         min_suitability_score: config.minSuitabilityScore,
         country: config.country,
-        has_city_locations: Array.isArray(resolvedCityLocations ?? config.cityLocations)
+        has_city_locations: Array.isArray(
+          resolvedCityLocations ?? config.cityLocations,
+        )
           ? (resolvedCityLocations ?? config.cityLocations ?? []).length > 0
           : false,
         search_terms_count: searchTermsState.searchTermsCount,
