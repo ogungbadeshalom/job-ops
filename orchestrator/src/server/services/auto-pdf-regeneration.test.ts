@@ -66,6 +66,7 @@ describe("auto PDF regeneration", () => {
       userId: null,
       enforceUserIsolation: false,
       scopeKey: "tenant-test",
+      role: "owner",
     });
     mocks.enqueue.mockResolvedValue({
       id: "queue-job-1",
@@ -157,6 +158,7 @@ describe("auto PDF regeneration", () => {
       userId: "user-a",
       enforceUserIsolation: true,
       scopeKey: "tenant-hosted:user-a",
+      role: "owner",
     });
     mocks.getReadyJobsWithGeneratedPdfs.mockResolvedValue([
       createJob({

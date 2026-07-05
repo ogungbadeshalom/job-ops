@@ -123,6 +123,7 @@ describe("design resume service", () => {
       userId: null,
       enforceUserIsolation: false,
       scopeKey: "tenant-test-2",
+      role: "owner",
     });
     repo.getLatestDesignResumeDocument.mockResolvedValue(makeDocumentRow());
     repo.listDesignResumeAssets.mockResolvedValue([]);
@@ -188,6 +189,7 @@ describe("design resume service", () => {
       userId: "user-2",
       enforceUserIsolation: true,
       scopeKey: "tenant-test-2:user-2",
+      role: "owner",
     });
 
     await replaceCurrentDesignResumeDocument({

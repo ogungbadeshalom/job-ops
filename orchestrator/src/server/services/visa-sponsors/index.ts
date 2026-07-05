@@ -213,7 +213,10 @@ async function downloadLatestDataForProvider(
     state.cache = null;
     state.cacheLoadedAt = null;
 
-    logger.info(`Downloaded sponsors`, { providerId: id, count: sponsors.length });
+    logger.info(`Downloaded sponsors`, {
+      providerId: id,
+      count: sponsors.length,
+    });
     return {
       success: true,
       message: `Successfully downloaded ${sponsors.length} sponsors`,
@@ -221,7 +224,10 @@ async function downloadLatestDataForProvider(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     state.updateError = message;
-    logger.error(`Failed to download sponsors`, { providerId: id, errorMessage: message });
+    logger.error(`Failed to download sponsors`, {
+      providerId: id,
+      errorMessage: message,
+    });
     return {
       success: false,
       message,
@@ -494,11 +500,16 @@ export async function initialize(): Promise<void> {
     const metadata = readMetadata(manifest.id);
 
     if (!metadata.csvFile) {
-      logger.info(`No data for provider, downloading`, { providerId: manifest.id });
+      logger.info(`No data for provider, downloading`, {
+        providerId: manifest.id,
+      });
       await downloadLatestDataForProvider(manifest);
     } else {
       const sponsors = loadSponsorsForProvider(manifest.id);
-      logger.info(`Provider initialized`, { providerId: manifest.id, count: sponsors.length });
+      logger.info(`Provider initialized`, {
+        providerId: manifest.id,
+        count: sponsors.length,
+      });
     }
 
     // Start per-provider scheduler
