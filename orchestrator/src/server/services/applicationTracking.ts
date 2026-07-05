@@ -14,6 +14,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "../db/index";
 import {
+  clientDataScopeFilter,
   getPrivateDataScope,
   privateDataScopeFilter,
 } from "../tenancy/private-scope";
@@ -25,11 +26,17 @@ function jobsScopeFilter() {
 }
 
 function stageEventsScopeFilter() {
-  return privateDataScopeFilter(stageEvents);
+  const filters = [privateDataScopeFilter(stageEvents)];
+  const clientFilter = clientDataScopeFilter(stageEvents);
+  if (clientFilter) filters.push(clientFilter);
+  return and(...filters);
 }
 
 function tasksScopeFilter() {
-  return privateDataScopeFilter(tasks);
+  const filters = [privateDataScopeFilter(tasks)];
+  const clientFilter = clientDataScopeFilter(tasks);
+  if (clientFilter) filters.push(clientFilter);
+  return and(...filters);
 }
 
 const STAGE_TO_STATUS: Record<ApplicationStage, JobStatus> = {

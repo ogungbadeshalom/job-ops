@@ -108,12 +108,10 @@ export async function listAssignmentsForClient(
     );
 }
 
-export async function createAssignment(
-  input: {
-    workerId: string;
-    clientId: string;
-  },
-): Promise<AssignmentRow> {
+export async function createAssignment(input: {
+  workerId: string;
+  clientId: string;
+}): Promise<AssignmentRow> {
   const tenantId = getActiveTenantId();
   const now = new Date().toISOString();
   const id = randomUUID();

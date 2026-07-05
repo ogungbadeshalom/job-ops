@@ -8,6 +8,7 @@ export type RequestContext = {
   tenantId?: string;
   username?: string;
   isSystemAdmin?: boolean;
+  role?: string;
   analyticsSessionId?: string;
   requestUserAgent?: string;
 };
@@ -53,4 +54,21 @@ export function getUserId(): string | undefined {
 
 export function isSystemAdmin(): boolean {
   return storage.getStore()?.isSystemAdmin === true;
+}
+
+export function getRole(): string | undefined {
+  return storage.getStore()?.role;
+}
+
+export function requireRole(...allowedRoles: string[]): string {
+  const role = getRole();
+  if (!role) {
+    throw new Error("Role context is required");
+  }
+  if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    throw new Error(
+      `Role "${role}" is not permitted for this operation. Allowed: ${allowedRoles.join(", ")}`,
+    );
+  }
+  return role;
 }

@@ -1684,12 +1684,13 @@ function ensureAgencyTables(): void {
     );
   }
 
-  if (
-    tableExists("jobs") &&
-    !tableHasColumn("jobs", "client_id")
-  ) {
-    sqlite.exec("ALTER TABLE jobs ADD COLUMN client_id TEXT REFERENCES clients(id) ON DELETE SET NULL");
-    sqlite.exec("CREATE INDEX IF NOT EXISTS idx_jobs_client_id ON jobs(client_id)");
+  if (tableExists("jobs") && !tableHasColumn("jobs", "client_id")) {
+    sqlite.exec(
+      "ALTER TABLE jobs ADD COLUMN client_id TEXT REFERENCES clients(id) ON DELETE SET NULL",
+    );
+    sqlite.exec(
+      "CREATE INDEX IF NOT EXISTS idx_jobs_client_id ON jobs(client_id)",
+    );
   }
 
   if (
@@ -1703,9 +1704,15 @@ function ensureAgencyTables(): void {
 
   if (tableExists("tenant_memberships")) {
     const colInfo = sqlite
-      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tenant_memberships'")
+      .prepare(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='tenant_memberships'",
+      )
       .get() as { sql: string } | undefined;
-    if (colInfo && !colInfo.sql.includes("'worker'") && !colInfo.sql.includes("'admin'")) {
+    if (
+      colInfo &&
+      !colInfo.sql.includes("'worker'") &&
+      !colInfo.sql.includes("'admin'")
+    ) {
       sqlite.exec("PRAGMA foreign_keys = OFF");
       sqlite.exec(`CREATE TABLE tenant_memberships_new (
         id TEXT PRIMARY KEY,
@@ -1717,13 +1724,142 @@ function ensureAgencyTables(): void {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
       )`);
-      sqlite.exec("INSERT INTO tenant_memberships_new SELECT * FROM tenant_memberships");
+      sqlite.exec(
+        "INSERT INTO tenant_memberships_new SELECT * FROM tenant_memberships",
+      );
       sqlite.exec("DROP TABLE tenant_memberships");
-      sqlite.exec("ALTER TABLE tenant_memberships_new RENAME TO tenant_memberships");
-      sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_memberships_user_tenant ON tenant_memberships(user_id, tenant_id)");
-      sqlite.exec("CREATE INDEX IF NOT EXISTS idx_tenant_memberships_tenant_id ON tenant_memberships(tenant_id)");
+      sqlite.exec(
+        "ALTER TABLE tenant_memberships_new RENAME TO tenant_memberships",
+      );
+      sqlite.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_memberships_user_tenant ON tenant_memberships(user_id, tenant_id)",
+      );
+      sqlite.exec(
+        "CREATE INDEX IF NOT EXISTS idx_tenant_memberships_tenant_id ON tenant_memberships(tenant_id)",
+      );
       sqlite.exec("PRAGMA foreign_keys = ON");
     }
+  }
+}
+
+function ensureAgencyClientColumns(): void {
+  if (!tableExists("clients")) return;
+
+  const colMigrations: Array<{
+    table: string;
+    column: string;
+    backfillParentCol?: string;
+    parentTable?: string;
+    refAction: "SET NULL" | "CASCADE";
+  }> = [
+    {
+      table: "stage_events",
+      column: "client_id",
+      backfillParentCol: "application_id",
+      parentTable: "jobs",
+      refAction: "SET NULL",
+    },
+    {
+      table: "tasks",
+      column: "client_id",
+      backfillParentCol: "application_id",
+      parentTable: "jobs",
+      refAction: "SET NULL",
+    },
+    {
+      table: "job_notes",
+      column: "client_id",
+      backfillParentCol: "job_id",
+      parentTable: "jobs",
+      refAction: "SET NULL",
+    },
+    {
+      table: "job_documents",
+      column: "client_id",
+      backfillParentCol: "job_id",
+      parentTable: "jobs",
+      refAction: "SET NULL",
+    },
+    {
+      table: "watchlist_selected_sources",
+      column: "client_id",
+      refAction: "CASCADE",
+    },
+    {
+      table: "post_application_integrations",
+      column: "client_id",
+      refAction: "CASCADE",
+    },
+  ];
+
+  for (const {
+    table,
+    column,
+    backfillParentCol,
+    parentTable,
+    refAction,
+  } of colMigrations) {
+    if (!tableExists(table) || tableHasColumn(table, column)) continue;
+
+    sqlite.exec(
+      `ALTER TABLE ${table} ADD COLUMN ${column} TEXT REFERENCES clients(id) ON DELETE ${refAction}`,
+    );
+
+    if (backfillParentCol && parentTable) {
+      try {
+        sqlite.exec(`
+          UPDATE ${table}
+          SET ${column} = (
+            SELECT ${parentTable}.client_id
+            FROM ${parentTable}
+            WHERE ${parentTable}.id = ${table}.${backfillParentCol}
+            LIMIT 1
+          )
+          WHERE ${column} IS NULL
+        `);
+      } catch {
+        // Backfill is best-effort; column may be in a table rebuild that hasn't happened yet
+      }
+    }
+  }
+
+  if (tableHasColumn("stage_events", "client_id")) {
+    sqlite.exec(
+      "CREATE INDEX IF NOT EXISTS idx_stage_events_client_id ON stage_events(client_id)",
+    );
+  }
+  if (tableHasColumn("watchlist_selected_sources", "client_id")) {
+    sqlite.exec(
+      "CREATE INDEX IF NOT EXISTS idx_watchlist_selected_sources_client_id ON watchlist_selected_sources(client_id)",
+    );
+  }
+}
+
+function ensureClientCredentialsTable(): void {
+  if (!tableExists("client_credentials")) {
+    sqlite.exec(`
+      CREATE TABLE client_credentials (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'tenant_default',
+        client_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        email TEXT NOT NULL,
+        encrypted_access_token TEXT NOT NULL,
+        encrypted_refresh_token TEXT,
+        encrypted_client_secret TEXT,
+        metadata TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+      )
+    `);
+    sqlite.exec(
+      "CREATE INDEX IF NOT EXISTS idx_client_credentials_tenant_client_provider ON client_credentials(tenant_id, client_id, provider)",
+    );
+    sqlite.exec(
+      "CREATE INDEX IF NOT EXISTS idx_client_credentials_client_id ON client_credentials(client_id)",
+    );
   }
 }
 
@@ -1770,10 +1906,12 @@ function seedLegacyOwnerFromBasicAuth(): void {
 
 console.log("🔐 Applying tenancy compatibility migrations...");
 ensureTenantColumns();
+ensureClientCredentialsTable();
 seedLegacyOwnerFromBasicAuth();
 ensureAgencyTables();
-ensurePrivateUserColumns();
 rebuildPostApplicationPrivateTables();
+ensureAgencyClientColumns();
+ensurePrivateUserColumns();
 rebuildSettingsTable();
 ensureTracerLinksUniqueIndex();
 sqlite.exec("DROP INDEX IF EXISTS idx_settings_tenant_key_unique");

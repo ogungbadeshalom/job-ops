@@ -361,6 +361,9 @@ export const stageEvents = sqliteTable("stage_events", {
   userId: text("user_id").references(() => users.id, {
     onDelete: "cascade",
   }),
+  clientId: text("client_id").references(() => clients.id, {
+    onDelete: "set null",
+  }),
   applicationId: text("application_id")
     .notNull()
     .references(() => jobs.id, { onDelete: "cascade" }),
@@ -381,6 +384,9 @@ export const tasks = sqliteTable("tasks", {
     .references(() => tenants.id, { onDelete: "cascade" }),
   userId: text("user_id").references(() => users.id, {
     onDelete: "cascade",
+  }),
+  clientId: text("client_id").references(() => clients.id, {
+    onDelete: "set null",
   }),
   applicationId: text("application_id")
     .notNull()
@@ -404,6 +410,9 @@ export const jobNotes = sqliteTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, {
       onDelete: "cascade",
+    }),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "set null",
     }),
     jobId: text("job_id")
       .notNull()
@@ -708,6 +717,9 @@ export const watchlistSelectedSources = sqliteTable(
       .default("tenant_default")
       .references(() => tenants.id, { onDelete: "cascade" }),
     userId: text("user_id").notNull(),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "cascade",
+    }),
     catalogSourceId: text("catalog_source_id"),
     label: text("label").notNull(),
     careersUrl: text("careers_url").notNull(),
@@ -730,6 +742,9 @@ export const watchlistSelectedSources = sqliteTable(
     tenantUserIndex: index("idx_watchlist_selected_sources_tenant_user").on(
       table.tenantId,
       table.userId,
+    ),
+    clientIdIndex: index("idx_watchlist_selected_sources_client_id").on(
+      table.clientId,
     ),
   }),
 );
@@ -864,6 +879,9 @@ export const jobDocuments = sqliteTable(
     userId: text("user_id").references(() => users.id, {
       onDelete: "cascade",
     }),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "set null",
+    }),
     jobId: text("job_id")
       .notNull()
       .references(() => jobs.id, { onDelete: "cascade" }),
@@ -892,6 +910,9 @@ export const postApplicationIntegrations = sqliteTable(
       .default("tenant_default")
       .references(() => tenants.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    clientId: text("client_id").references(() => clients.id, {
       onDelete: "cascade",
     }),
     provider: text("provider", { enum: POST_APPLICATION_PROVIDERS }).notNull(),
@@ -1185,8 +1206,38 @@ export type TracerLinkRow = typeof tracerLinks.$inferSelect;
 export type NewTracerLinkRow = typeof tracerLinks.$inferInsert;
 export type TracerClickEventRow = typeof tracerClickEvents.$inferSelect;
 export type NewTracerClickEventRow = typeof tracerClickEvents.$inferInsert;
+export const clientCredentials = sqliteTable(
+  "client_credentials",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    email: text("email").notNull(),
+    encryptedAccessToken: text("encrypted_access_token").notNull(),
+    encryptedRefreshToken: text("encrypted_refresh_token"),
+    encryptedClientSecret: text("encrypted_client_secret"),
+    metadata: text("metadata"),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (table) => ({
+    tenantClientProviderIndex: index(
+      "idx_client_credentials_tenant_client_provider",
+    ).on(table.tenantId, table.clientId, table.provider),
+    clientIdIndex: index("idx_client_credentials_client_id").on(table.clientId),
+  }),
+);
+
 export type ClientRow = typeof clients.$inferSelect;
 export type NewClientRow = typeof clients.$inferInsert;
-export type WorkerClientAssignmentRow = typeof workerClientAssignments.$inferSelect;
+export type ClientCredentialRow = typeof clientCredentials.$inferSelect;
+export type NewClientCredentialRow = typeof clientCredentials.$inferInsert;
+export type WorkerClientAssignmentRow =
+  typeof workerClientAssignments.$inferSelect;
 export type NewWorkerClientAssignmentRow =
   typeof workerClientAssignments.$inferInsert;

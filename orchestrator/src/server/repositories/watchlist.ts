@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { getUserId } from "@server/infra/request-context";
 import type {
   UpdateWatchlistSelectionsInput,
   WatchlistCheckInput,
@@ -8,8 +7,13 @@ import type {
   WatchlistSelectedSource,
 } from "@shared/types";
 import { and, asc, eq, inArray } from "drizzle-orm";
+import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { db, schema } from "../db/index";
-import { getActiveTenantId } from "../tenancy/context";
+import {
+  clientDataScopeFilter,
+  getPrivateDataScope,
+  privateDataScopeFilter,
+} from "../tenancy/private-scope";
 
 const {
   watchlistChecks,
@@ -18,12 +22,15 @@ const {
   watchlistSelectedSources,
 } = schema;
 
-function requireActiveUserId(): string {
-  const userId = getUserId();
-  if (!userId) {
-    throw new Error("User context is required for watchlist source selections");
-  }
-  return userId;
+function userScopedFilter(table: {
+  tenantId: AnySQLiteColumn;
+  userId: AnySQLiteColumn;
+}) {
+  const scope = getPrivateDataScope();
+  return and(
+    eq(table.tenantId, scope.tenantId),
+    eq(table.userId, scope.userId!),
+  );
 }
 
 function mapRowToWatchlistJobState(
@@ -58,17 +65,15 @@ function mapRowToWatchlistSelectedSource(
 export async function listWatchlistSelectedSources(): Promise<
   WatchlistSelectedSource[]
 > {
-  const tenantId = getActiveTenantId();
-  const userId = requireActiveUserId();
+  const filters = [privateDataScopeFilter(watchlistSelectedSources)];
+  const clientFilter = clientDataScopeFilter(watchlistSelectedSources);
+  if (clientFilter) filters.push(clientFilter);
+  const where = and(...filters);
+
   const rows = await db
     .select()
     .from(watchlistSelectedSources)
-    .where(
-      and(
-        eq(watchlistSelectedSources.tenantId, tenantId),
-        eq(watchlistSelectedSources.userId, userId),
-      ),
-    )
+    .where(where)
     .orderBy(asc(watchlistSelectedSources.sortOrder));
 
   return rows.map(mapRowToWatchlistSelectedSource);
@@ -76,19 +81,14 @@ export async function listWatchlistSelectedSources(): Promise<
 
 export async function replaceWatchlistSelectedSources(
   input: UpdateWatchlistSelectionsInput,
+  clientId?: string | null,
 ): Promise<WatchlistSelectedSource[]> {
-  const tenantId = getActiveTenantId();
-  const userId = requireActiveUserId();
+  const scope = getPrivateDataScope();
   const now = new Date().toISOString();
 
   db.transaction((tx) => {
     tx.delete(watchlistSelectedSources)
-      .where(
-        and(
-          eq(watchlistSelectedSources.tenantId, tenantId),
-          eq(watchlistSelectedSources.userId, userId),
-        ),
-      )
+      .where(privateDataScopeFilter(watchlistSelectedSources))
       .run();
 
     if (input.selections.length === 0) {
@@ -99,8 +99,9 @@ export async function replaceWatchlistSelectedSources(
       .values(
         input.selections.map((selection, index) => ({
           id: randomUUID(),
-          tenantId,
-          userId,
+          tenantId: scope.tenantId,
+          userId: scope.userId!,
+          clientId: clientId ?? null,
           catalogSourceId: selection.catalogSourceId ?? null,
           label: selection.label?.trim() || selection.careersUrl,
           careersUrl: selection.careersUrl,
@@ -119,16 +120,10 @@ export async function replaceWatchlistSelectedSources(
 }
 
 export async function listWatchlistJobStates(): Promise<WatchlistJobState[]> {
-  const userId = requireActiveUserId();
   const rows = await db
     .select()
     .from(watchlistJobStates)
-    .where(
-      and(
-        eq(watchlistJobStates.tenantId, getActiveTenantId()),
-        eq(watchlistJobStates.userId, userId),
-      ),
-    );
+    .where(userScopedFilter(watchlistJobStates));
 
   return rows.map(mapRowToWatchlistJobState);
 }
@@ -138,8 +133,7 @@ export async function setWatchlistJobState(input: {
   sourceJobId: string;
   state: WatchlistJobState["state"];
 }): Promise<WatchlistJobState> {
-  const tenantId = getActiveTenantId();
-  const userId = requireActiveUserId();
+  const scope = getPrivateDataScope();
   const now = new Date().toISOString();
 
   const [existing] = await db
@@ -147,8 +141,7 @@ export async function setWatchlistJobState(input: {
     .from(watchlistJobStates)
     .where(
       and(
-        eq(watchlistJobStates.tenantId, tenantId),
-        eq(watchlistJobStates.userId, userId),
+        userScopedFilter(watchlistJobStates),
         eq(watchlistJobStates.source, input.source),
         eq(watchlistJobStates.sourceJobId, input.sourceJobId),
       ),
@@ -160,15 +153,15 @@ export async function setWatchlistJobState(input: {
       .set({ state: input.state, updatedAt: now })
       .where(
         and(
-          eq(watchlistJobStates.tenantId, tenantId),
+          userScopedFilter(watchlistJobStates),
           eq(watchlistJobStates.id, existing.id),
         ),
       );
   } else {
     await db.insert(watchlistJobStates).values({
       id: randomUUID(),
-      tenantId,
-      userId,
+      tenantId: scope.tenantId,
+      userId: scope.userId!,
       source: input.source,
       sourceJobId: input.sourceJobId,
       state: input.state,
@@ -182,8 +175,7 @@ export async function setWatchlistJobState(input: {
     .from(watchlistJobStates)
     .where(
       and(
-        eq(watchlistJobStates.tenantId, tenantId),
-        eq(watchlistJobStates.userId, userId),
+        userScopedFilter(watchlistJobStates),
         eq(watchlistJobStates.source, input.source),
         eq(watchlistJobStates.sourceJobId, input.sourceJobId),
       ),
@@ -199,13 +191,11 @@ export async function clearWatchlistJobState(input: {
   source: string;
   sourceJobId: string;
 }): Promise<number> {
-  const userId = requireActiveUserId();
   const result = await db
     .delete(watchlistJobStates)
     .where(
       and(
-        eq(watchlistJobStates.tenantId, getActiveTenantId()),
-        eq(watchlistJobStates.userId, userId),
+        userScopedFilter(watchlistJobStates),
         eq(watchlistJobStates.source, input.source),
         eq(watchlistJobStates.sourceJobId, input.sourceJobId),
       ),
@@ -217,8 +207,7 @@ export async function clearWatchlistJobState(input: {
 export async function recordWatchlistCheck(
   input: WatchlistCheckInput,
 ): Promise<WatchlistCheckResponse> {
-  const tenantId = getActiveTenantId();
-  const userId = requireActiveUserId();
+  const scope = getPrivateDataScope();
   const now = new Date().toISOString();
 
   const normalizedChecks = input.checks
@@ -238,12 +227,7 @@ export async function recordWatchlistCheck(
     const existingCheckpoint = tx
       .select()
       .from(watchlistChecks)
-      .where(
-        and(
-          eq(watchlistChecks.tenantId, tenantId),
-          eq(watchlistChecks.userId, userId),
-        ),
-      )
+      .where(userScopedFilter(watchlistChecks))
       .get();
 
     const previousLastCheckedAt = existingCheckpoint?.lastCheckedAt ?? null;
@@ -253,8 +237,7 @@ export async function recordWatchlistCheck(
         .from(watchlistSeenJobs)
         .where(
           and(
-            eq(watchlistSeenJobs.tenantId, tenantId),
-            eq(watchlistSeenJobs.userId, userId),
+            userScopedFilter(watchlistSeenJobs),
             eq(watchlistSeenJobs.source, check.source),
             inArray(watchlistSeenJobs.sourceJobId, check.sourceJobIds),
           ),
@@ -278,9 +261,9 @@ export async function recordWatchlistCheck(
 
         tx.insert(watchlistSeenJobs)
           .values({
-            id: existing?.id ?? randomUUID(),
-            tenantId,
-            userId,
+            id: randomUUID(),
+            tenantId: scope.tenantId,
+            userId: scope.userId!,
             source: check.source,
             sourceJobId,
             firstSeenAt: existing?.firstSeenAt ?? now,
@@ -307,8 +290,8 @@ export async function recordWatchlistCheck(
     tx.insert(watchlistChecks)
       .values({
         id: existingCheckpoint?.id ?? randomUUID(),
-        tenantId,
-        userId,
+        tenantId: scope.tenantId,
+        userId: scope.userId!,
         lastCheckedAt: now,
         createdAt: existingCheckpoint?.createdAt ?? now,
         updatedAt: now,

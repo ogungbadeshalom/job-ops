@@ -145,7 +145,7 @@ Three roles for the agency use case:
 | `worker` | `isSystemAdmin: false` | See assigned clients, run pipeline, apply to jobs. |
 | `client` | `isSystemAdmin: false` | Read-only dashboard of own jobs, download CVs. |
 
-**Tables added:** `clients`, `worker_client_assignments`. `client_id` on `jobs` and `pipeline_runs`.
+**Tables added:** `clients`, `worker_client_assignments`. `client_id` on `jobs`, `pipeline_runs`, `stage_events`, `tasks`, `job_notes`, `job_documents`, `watchlist_selected_sources`, `post_application_integrations`.
 
 **Role in JWT:** stored in `tenant_memberships.role` and embedded in JWT. Admin detection uses `isSystemAdmin` flag ONLY — not the role field.
 
@@ -193,6 +193,37 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume (code ke
 2. ✅ Wire pipeline "Run" button (with SSE progress)
 3. ⏳ Onboarding edge cases (known issue: worker still sees wizard)
 4. ⏳ IMAP (deferred)
+
+## Multi-Stage Build Plan
+
+### Stage A — Schema + Access Control (sequential)
+- **A1 ✅ (2026-07-05):** Added `clientId` column to `stage_events`, `tasks`, `job_notes`, `job_documents` (ON DELETE SET NULL), `watchlist_selected_sources`, `post_application_integrations` (ON DELETE CASCADE). Role stays on `tenant_memberships` — no `users.role` column. Schema in `schema.ts`, migration in `migrate.ts:ensureAgencyClientColumns()`.
+- **A2 ⏳:** Extend `private-scope.ts` with role-based filtering (`admin`/`worker`/`client`). Add `requireRole()`. Write role-isolation tests.
+
+### Stage B — Routes (parallel, depends on A2)
+- **B1 ⏳:** Admin routes for client CRUD
+- **B2 ⏳:** Role guards on existing job/watchlist/post-application routes
+- **B3 ⏳:** Auth flow changes (role-aware signup/login)
+
+### Stage C — Frontend (parallel, depends on B)
+- **C1 ⏳:** Admin screens
+- **C2 ⏳:** Worker scoped view
+- **C3 ⏳:** Client read-only portal
+
+### Stage D — Per-Client Scoping (parallel, depends on A)
+- **D1 ⏳:** Credential vault (confirm needed)
+- **D2 ⏳:** Per-client scoping for watchlist/post-application
+
+### Stage E — Reporting (parallel, lowest risk)
+- **E1 ⏳:** Admin reporting dashboard
+- **E2 ⏳:** Client digest email (confirm needed)
+- **E3 ⏳:** Billing/plan tracking (confirm needed)
+
+### Files Changed (A1)
+| File | Change |
+|------|--------|
+| `orchestrator/src/server/db/schema.ts` | Added `clientId` FK column to `stageEvents`, `tasks`, `jobNotes`, `jobDocuments`, `watchlistSelectedSources`, `postApplicationIntegrations` |
+| `orchestrator/src/server/db/migrate.ts` | Added `ensureAgencyClientColumns()` function with ALTER TABLE + backfill + indexes |
 
 ## Validation
 

@@ -53,12 +53,12 @@ export async function listClients(): Promise<ClientWithAssignment[]> {
         eq(workerClientAssignments.status, "active"),
       ),
     )
-    .leftJoin(
-      users,
-      eq(users.id, workerClientAssignments.workerId),
-    )
+    .leftJoin(users, eq(users.id, workerClientAssignments.workerId))
     .where(eq(clients.tenantId, tenantId));
-  return rows.map((r) => ({ ...r, assignedWorkerName: r.assignedWorkerName ?? null }));
+  return rows.map((r) => ({
+    ...r,
+    assignedWorkerName: r.assignedWorkerName ?? null,
+  }));
 }
 
 export async function listClientsForWorker(
@@ -94,20 +94,16 @@ export async function listClientsForWorker(
         eq(workerClientAssignments.status, "active"),
       ),
     )
-    .leftJoin(
-      users,
-      eq(users.id, workerClientAssignments.workerId),
-    )
-    .where(
-      and(
-        eq(clients.tenantId, tenantId),
-        eq(clients.status, "active"),
-      ),
-    );
+    .leftJoin(users, eq(users.id, workerClientAssignments.workerId))
+    .where(and(eq(clients.tenantId, tenantId), eq(clients.status, "active")));
   if (rows.length === 0) {
     // Debug: check if assignments exist for this worker at all
     const allAssignments = await db
-      .select({ id: workerClientAssignments.id, workerId: workerClientAssignments.workerId, status: workerClientAssignments.status })
+      .select({
+        id: workerClientAssignments.id,
+        workerId: workerClientAssignments.workerId,
+        status: workerClientAssignments.status,
+      })
       .from(workerClientAssignments)
       .where(eq(workerClientAssignments.workerId, workerId));
     if (allAssignments.length > 0) {
@@ -115,7 +111,10 @@ export async function listClientsForWorker(
       // Log but don't crash; return empty and let the frontend handle it
     }
   }
-  return rows.map((r) => ({ ...r, assignedWorkerName: r.assignedWorkerName ?? null }));
+  return rows.map((r) => ({
+    ...r,
+    assignedWorkerName: r.assignedWorkerName ?? null,
+  }));
 }
 
 export async function getClientForClientUser(
@@ -126,18 +125,13 @@ export async function getClientForClientUser(
     .select()
     .from(clients)
     .where(
-      and(
-        eq(clients.tenantId, tenantId),
-        eq(clients.createdBy, clientUserId),
-      ),
+      and(eq(clients.tenantId, tenantId), eq(clients.createdBy, clientUserId)),
     )
     .limit(1);
   return row ?? null;
 }
 
-export async function createClient(
-  input: NewClientRow,
-): Promise<ClientRow> {
+export async function createClient(input: NewClientRow): Promise<ClientRow> {
   const id = input.id ?? randomUUID();
   const now = new Date().toISOString();
   await db.insert(clients).values({
@@ -164,7 +158,9 @@ export async function createClient(
 
 export async function updateClient(
   id: string,
-  input: Partial<Omit<NewClientRow, "id" | "tenantId" | "createdBy" | "createdAt">>,
+  input: Partial<
+    Omit<NewClientRow, "id" | "tenantId" | "createdBy" | "createdAt">
+  >,
 ): Promise<ClientRow | null> {
   const tenantId = getActiveTenantId();
   const client = await getClientById(id);
@@ -180,9 +176,7 @@ export async function updateClient(
   return getClientById(id);
 }
 
-export async function deleteClient(
-  id: string,
-): Promise<boolean> {
+export async function deleteClient(id: string): Promise<boolean> {
   const tenantId = getActiveTenantId();
   const client = await getClientById(id);
   if (!client) return false;
@@ -242,16 +236,19 @@ export async function setClientCreatedBy(
 
 export async function getClientJobCount(
   clientId: string,
-): Promise<{ total: number; applied: number; interviewing: number; offer: number }> {
+): Promise<{
+  total: number;
+  applied: number;
+  interviewing: number;
+  offer: number;
+}> {
   const tenantId = getActiveTenantId();
   const { jobs } = schema;
 
   const [totalRow] = await db
     .select({ count: sql<number>`count(*)` })
     .from(jobs)
-    .where(
-      and(eq(jobs.clientId, clientId), eq(jobs.tenantId, tenantId)),
-    );
+    .where(and(eq(jobs.clientId, clientId), eq(jobs.tenantId, tenantId)));
   const [appliedRow] = await db
     .select({ count: sql<number>`count(*)` })
     .from(jobs)

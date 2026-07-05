@@ -31,10 +31,13 @@ import {
   isNull,
   lt,
   ne,
+  or,
+  type SQL,
   sql,
 } from "drizzle-orm";
 import { db, schema } from "../db/index";
 import {
+  clientDataScopeFilter,
   getPrivateDataScope,
   privateDataScopeFilter,
 } from "../tenancy/private-scope";
@@ -42,7 +45,37 @@ import {
 const { jobNotes, jobs } = schema;
 
 function jobsScopeFilter() {
-  return privateDataScopeFilter(jobs);
+  const scope = getPrivateDataScope();
+  const tenantFilter = eq(jobs.tenantId, scope.tenantId);
+  const { userId, role } = scope;
+
+  // Admins/owners have full tenant access.
+  if (role === "admin" || role === "owner") {
+    return tenantFilter as SQL;
+  }
+
+  // Defensive fallback if userId is missing.
+  if (!userId) {
+    return tenantFilter as SQL;
+  }
+
+  // Workers see their own jobs plus jobs assigned to their clients.
+  if (role === "worker") {
+    const workerClientFilter = clientDataScopeFilter(jobs);
+    const filters: SQL[] = [eq(jobs.userId, userId)];
+    if (workerClientFilter) filters.push(workerClientFilter);
+    return and(tenantFilter, or(...filters)) as SQL;
+  }
+
+  // Clients see only jobs assigned to their client profile.
+  if (role === "client") {
+    const clientFilter = clientDataScopeFilter(jobs);
+    if (!clientFilter) return tenantFilter as SQL;
+    return and(tenantFilter, clientFilter) as SQL;
+  }
+
+  // Regular members see only their own jobs.
+  return and(tenantFilter, eq(jobs.userId, userId)) as SQL;
 }
 
 function jobNotesScopeFilter() {

@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { JobDocument } from "@shared/types";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, type SQL } from "drizzle-orm";
 import { db, schema } from "../db/index";
 import {
+  clientDataScopeFilter,
   getPrivateDataScope,
   privateDataScopeFilter,
 } from "../tenancy/private-scope";
@@ -10,7 +11,10 @@ import {
 const { jobDocuments } = schema;
 
 function documentsScopeFilter() {
-  return privateDataScopeFilter(jobDocuments);
+  const filters = [privateDataScopeFilter(jobDocuments)];
+  const clientFilter = clientDataScopeFilter(jobDocuments);
+  if (clientFilter) filters.push(clientFilter);
+  return and(...filters) as SQL;
 }
 
 type CreateJobDocumentInput = {

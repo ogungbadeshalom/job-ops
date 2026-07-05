@@ -24,6 +24,9 @@ let isClosed = false;
 
 export const db = drizzle(sqlite, { schema });
 
+/** Raw better-sqlite3 connection for non-ORM queries. */
+export const rawDb = sqlite;
+
 export { schema };
 
 export function closeDb() {

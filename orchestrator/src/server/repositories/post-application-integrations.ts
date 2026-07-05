@@ -7,6 +7,7 @@ import type {
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../db";
 import {
+  clientDataScopeFilter,
   getPrivateDataScope,
   privateDataScopeFilter,
 } from "../tenancy/private-scope";
@@ -14,7 +15,10 @@ import {
 const { postApplicationIntegrations } = schema;
 
 function integrationsScopeFilter() {
-  return privateDataScopeFilter(postApplicationIntegrations);
+  const filters = [privateDataScopeFilter(postApplicationIntegrations)];
+  const clientFilter = clientDataScopeFilter(postApplicationIntegrations);
+  if (clientFilter) filters.push(clientFilter);
+  return and(...filters);
 }
 
 type IntegrationCredentials = Record<string, unknown>;
@@ -24,6 +28,7 @@ type UpsertConnectedIntegrationInput = {
   accountKey: string;
   displayName?: string | null;
   credentials: IntegrationCredentials;
+  clientId?: string | null;
 };
 
 type UpdatePostApplicationIntegrationSyncStateInput = {
@@ -119,6 +124,7 @@ export async function upsertConnectedPostApplicationIntegration(
     id,
     tenantId: scope.tenantId,
     userId: scope.userId,
+    clientId: input.clientId ?? null,
     provider: input.provider,
     accountKey: input.accountKey,
     displayName: input.displayName ?? null,
