@@ -1,5 +1,6 @@
-import { badRequest, toAppError } from "@infra/errors";
+import { badRequest, forbidden, toAppError } from "@infra/errors";
 import { fail, ok } from "@infra/http";
+import { isSystemAdmin } from "@infra/request-context";
 import { isDemoMode, sendDemoBlocked } from "@server/config/demo";
 import * as jobsRepo from "@server/repositories/jobs";
 import type { JobStatus } from "@shared/types";
@@ -22,6 +23,9 @@ jobsMaintenanceRouter.delete(
   "/status/:status",
   async (req: Request, res: Response) => {
     try {
+      if (!isSystemAdmin()) {
+        return fail(res, forbidden("Administrator access is required"));
+      }
       if (isDemoMode()) {
         return sendDemoBlocked(
           res,
@@ -55,6 +59,9 @@ jobsMaintenanceRouter.delete(
   "/score/:threshold",
   async (req: Request, res: Response) => {
     try {
+      if (!isSystemAdmin()) {
+        return fail(res, forbidden("Administrator access is required"));
+      }
       if (isDemoMode()) {
         return sendDemoBlocked(
           res,

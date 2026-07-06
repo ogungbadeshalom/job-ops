@@ -9,6 +9,7 @@ import {
 import { useUpdateSettingsMutation } from "@client/hooks/queries/useSettingsMutation";
 import { useRxResumeConfigState } from "@client/hooks/useRxResumeConfigState";
 import { useTracerReadiness } from "@client/hooks/useTracerReadiness";
+import { isAdminFromToken } from "@client/lib/jwt";
 import {
   getRxResumeCredentialDrafts,
   getRxResumeCredentialPrecheckFailure,
@@ -835,6 +836,7 @@ export const SettingsPage: React.FC = () => {
   const isLoadingBackups = backupsQuery.isLoading;
   const canEditLlmSettings =
     appStatusQuery.data?.capabilities.userEditableLlmSettings ?? true;
+  const isAdmin = isAdminFromToken();
   useQueryErrorToast(appStatusQuery.error, "Failed to load app status");
   useQueryErrorToast(backupsQuery.error, "Failed to load backups");
 
@@ -1068,7 +1070,7 @@ export const SettingsPage: React.FC = () => {
 
   const lockedCount = resumeProjectsValue?.lockedProjectIds.length ?? 0;
 
-  const canSave = isDirty && isValid;
+  const canSave = isDirty && isValid && isAdmin;
 
   const onSave = async (data: UpdateSettingsInput) => {
     if (!settings) return;
@@ -1422,10 +1424,12 @@ export const SettingsPage: React.FC = () => {
       SETTINGS_NAV_GROUPS.map((group) => ({
         ...group,
         items: group.items.filter(
-          (item) => canEditLlmSettings || item.id !== "model",
+          (item) =>
+            (canEditLlmSettings || item.id !== "model") &&
+            (isAdmin || item.id === "display"),
         ),
       })).filter((group) => group.items.length > 0),
-    [canEditLlmSettings],
+    [canEditLlmSettings, isAdmin],
   );
 
   const filteredNavGroups = useMemo(
@@ -1684,7 +1688,7 @@ export const SettingsPage: React.FC = () => {
       );
       break;
     case "danger-zone":
-      activeSectionContent = (
+      activeSectionContent = isAdmin ? (
         <DangerZoneSection
           statusesToClear={statusesToClear}
           toggleStatusToClear={toggleStatusToClear}
@@ -1695,6 +1699,10 @@ export const SettingsPage: React.FC = () => {
           isSaving={isSaving}
           layoutMode="panel"
         />
+      ) : (
+        <div className="p-4 text-sm text-muted-foreground">
+          Only administrators can access the Danger Zone.
+        </div>
       );
       break;
     default:
@@ -1737,36 +1745,42 @@ export const SettingsPage: React.FC = () => {
                 : null
             }
             actions={
-              <>
-                {activeSectionIsDirty ? (
+              isAdmin ? (
+                <>
+                  {activeSectionIsDirty ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="whitespace-nowrap"
+                      onClick={handleDiscardChanges}
+                      disabled={isLoading || isSaving || !isDirty}
+                    >
+                      Discard changes
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="outline"
                     className="whitespace-nowrap"
-                    onClick={handleDiscardChanges}
-                    disabled={isLoading || isSaving || !isDirty}
+                    onClick={handleReset}
+                    disabled={isLoading || isSaving || !settings}
                   >
-                    Discard changes
+                    Reset to defaults
                   </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="whitespace-nowrap"
-                  onClick={handleReset}
-                  disabled={isLoading || isSaving || !settings}
-                >
-                  Reset to defaults
-                </Button>
-                <Button
-                  type="button"
-                  className="whitespace-nowrap"
-                  onClick={handleSubmit(onSave)}
-                  disabled={isLoading || isSaving || !canSave}
-                >
-                  {isSaving ? "Saving..." : "Save changes"}
-                </Button>
-              </>
+                  <Button
+                    type="button"
+                    className="whitespace-nowrap"
+                    onClick={handleSubmit(onSave)}
+                    disabled={isLoading || isSaving || !canSave}
+                  >
+                    {isSaving ? "Saving..." : "Save changes"}
+                  </Button>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Only administrators can change system settings.
+                </div>
+              )
             }
             footer={
               Object.keys(errors).length > 0 ? (

@@ -145,7 +145,7 @@ Three roles for the agency use case:
 | `worker` | `isSystemAdmin: false` | See assigned clients, run pipeline, apply to jobs. |
 | `client` | `isSystemAdmin: false` | Read-only dashboard of own jobs, download CVs. |
 
-**Tables added:** `clients`, `worker_client_assignments`. `client_id` on `jobs`, `pipeline_runs`, `stage_events`, `tasks`, `job_notes`, `job_documents`, `watchlist_selected_sources`, `post_application_integrations`.
+**Tables added:** `clients`, `worker_client_assignments`, `client_credentials`. `client_id` on `jobs`, `pipeline_runs`, `stage_events`, `tasks`, `job_notes`, `job_documents`, `watchlist_selected_sources`, `post_application_integrations`.
 
 **Role in JWT:** stored in `tenant_memberships.role` and embedded in JWT. Admin detection uses `isSystemAdmin` flag ONLY — not the role field.
 
@@ -170,11 +170,16 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume (code ke
 ## Design Decisions
 
 - **localStorage** over sessionStorage — token persists across browser tabs
-- **isSystemAdmin** for admin check — workers get `role: "owner"` by default
+- **isSystemAdmin** for admin check — workspace users default to `role: "member"`; workers are created explicitly via `/admin/workers` which passes `role: "worker"`
 - **Base64url decode** in JWT — normalize `-_` → `+/` before `atob()`
 - **AppSidebar + SidebarContext** — replaced broken shadcn Sheet
+- **Mobile sidebar toggle** — hamburger button (`lg:hidden`) opens the sidebar below 1024px so Sign Out and nav are always reachable
 - **PM2 not Docker** — 38GB VPS too small for Docker layers
 - **Port 3001** — direct Node.js deployment, not Docker's 3005
+- **Settings admin-only** — `PATCH /api/settings`, `DELETE /api/database`, `POST /api/jobs/maintenance/*`, and backups writes are gated to `isSystemAdmin()`. Non-admins see only "Display Preferences" (read-only) in Settings.
+- **Pipeline fallback for non-admin Run** — `usePipelineControls` skips `updateSettings` for non-admins so workers can run searches without admin settings.
+- **Scoring concurrency = 2** — reduced from 4 to avoid LLM provider 429s; scoring + brief generation run sequentially, not in parallel.
+- **Worker dashboard inline** — expandable rows with posting link, PDF download, mark-applied for any non-applied status; no navigation to the admin orchestrator.
 
 ## Known Bug Fixes
 
@@ -186,44 +191,71 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume (code ke
 6. **"My Clients" missing** — `role !== "client"` condition added.
 7. **Duplicate export crash** — sub-agents both added same functions to repo. Fixed: removed duplicates.
 8. **Role constraint too strict** — `tenant_memberships.role` only allowed `owner`/`member`. Fixed: migration recreates table with full role set.
+9. **Role guards excluded `member`** — many routes used `requireRole("admin", "owner", "worker")`, blocking regular workspace users. Fixed: added `requireNonClientRole()` helper that allows admin/owner/worker/member.
+10. **Workspace user creation defaulted to `worker`** — `/api/workspaces/users` created all non-admin users as `worker`. Fixed: defaults to `member`, accepts optional `role`; `AdminWorkersPage` passes `role: "worker"`.
+11. **Watchlist seen-jobs reused cross-user IDs** — `recordWatchlistCheck` reused `existing?.id` which could belong to another user in non-hosted mode. Fixed: always generate new UUID; added `userScopedFilter()` that always filters by userId.
+12. **`jobsScopeFilter` not role-aware** — jobs were filtered by userId only in hosted mode, so members saw each other's jobs. Fixed: rewritten — admin/owner see all tenant jobs, worker sees assigned clients + own, client sees own client profile, member sees own.
+13. **`rebuildPostApplicationPrivateTables` ran AFTER `ensureAgencyClientColumns`** — the table rebuild dropped `client_id` from `post_application_integrations`. Fixed: reordered migrations so the rebuild runs first, then `client_id` is added.
+14. **`PATCH /api/settings` open to all roles** — any authenticated user could change LLM keys and prompts. Fixed: now admin-only (demo-mode check first, then admin guard).
+15. **AdminOverviewPage referenced non-existent server fields** — used `clientBreakdown`/`recentRuns`/`activeClients` but server returned `clients`/`recentPipelineRuns`/no-active-clients. Fixed: aligned client types to server, added `activeClients` count and `clientName` join.
+16. **Scoring hit LLM 429 (8 concurrent calls)** — `SCORING_CONCURRENCY=4` × 2 parallel LLM calls exceeded provider's limit of 4. Fixed: concurrency=2 + sequential scoring/brief generation.
+17. **Worker dashboard "View" ejected into admin orchestrator** — showed all clients' jobs with no agency context. Fixed: replaced with inline expandable rows (description, posting link, PDF download, mark-applied).
 
 ## Priority Build Queue (Current)
 
 1. ✅ Client account creation (create-login endpoint + UI)
 2. ✅ Wire pipeline "Run" button (with SSE progress)
-3. ⏳ Onboarding edge cases (known issue: worker still sees wizard)
+3. ✅ Onboarding edge cases — `OnboardingGate` now skips redirect for non-admin users (workers/clients bypass the wizard). `OnboardingCoach` step-nav tests are pre-existing failures, not blockers.
 4. ⏳ IMAP (deferred)
+5. ⏳ PDF generation requires Typst binary on local setups (`winget install --id Typst.Typst`, renderer set to `typst`). `TECTONIC_BIN`/`TYPST_BIN` env vars override the binary path.
 
 ## Multi-Stage Build Plan
 
 ### Stage A — Schema + Access Control (sequential)
 - **A1 ✅ (2026-07-05):** Added `clientId` column to `stage_events`, `tasks`, `job_notes`, `job_documents` (ON DELETE SET NULL), `watchlist_selected_sources`, `post_application_integrations` (ON DELETE CASCADE). Role stays on `tenant_memberships` — no `users.role` column. Schema in `schema.ts`, migration in `migrate.ts:ensureAgencyClientColumns()`.
-- **A2 ⏳:** Extend `private-scope.ts` with role-based filtering (`admin`/`worker`/`client`). Add `requireRole()`. Write role-isolation tests.
+- **A2 ✅ (2026-07-06):** Extended `private-scope.ts` with `clientDataScopeFilter()` (role-aware client scoping) and `requireRole()`/`requireNonClientRole()`. Wrote `role-isolation.test.ts` covering admin/worker/client scoping across jobs, notes, documents, pipeline runs, and credentials.
 
 ### Stage B — Routes (parallel, depends on A2)
-- **B1 ⏳:** Admin routes for client CRUD
-- **B2 ⏳:** Role guards on existing job/watchlist/post-application routes
-- **B3 ⏳:** Auth flow changes (role-aware signup/login)
+- **B1 ✅ (2026-07-06):** Admin routes for client CRUD (`clients.ts`: list/create/update/delete/stats/create-login), worker assignments (`assignments.ts`).
+- **B2 ✅ (2026-07-06):** `requireNonClientRole()` applied to job actions, application, documents, mutations, notes, stages, pipeline, post-application, and watchlist routes. Destructive routes (`DELETE /api/database`, `DELETE /api/jobs/maintenance/*`) gated to `isSystemAdmin()`.
+- **B3 ✅ (2026-07-06):** Workspace user creation accepts optional `role` (defaults to `member`); client logins created via `/clients/:id/create-login`; `PATCH /api/settings` admin-only.
 
 ### Stage C — Frontend (parallel, depends on B)
-- **C1 ⏳:** Admin screens
-- **C2 ⏳:** Worker scoped view
-- **C3 ⏳:** Client read-only portal
+- **C1 ✅ (2026-07-06):** Admin screens — Overview (stats + breakdowns), Clients list, ClientNew, ClientEdit, Workers.
+- **C2 ✅ (2026-07-06):** Worker scoped view — ClientsPage (assigned clients) + ClientDashboardPage with expandable rows (description, posting link, PDF download, mark-applied).
+- **C3 ✅ (2026-07-06):** Client read-only portal — MyJobsPage + MyJobDetailPage; `/my-jobs` routes restricted to `requiredRole="client"`.
 
 ### Stage D — Per-Client Scoping (parallel, depends on A)
-- **D1 ⏳:** Credential vault (confirm needed)
-- **D2 ⏳:** Per-client scoping for watchlist/post-application
+- **D1 ✅ (2026-07-06):** Credential vault — `client-credentials.ts` route + `credential-vault.ts` service + `client-credentials.test.ts`.
+- **D2 ✅ (2026-07-06):** Per-client scoping for watchlist (`userScopedFilter()` always filters by userId) and post-application (`client_id` + `clientDataScopeFilter`).
 
 ### Stage E — Reporting (parallel, lowest risk)
-- **E1 ⏳:** Admin reporting dashboard
+- **E1 ✅ (2026-07-06):** Admin reporting dashboard — `admin/stats.ts` route + `admin-stats.ts` repository + `AdminOverviewPage` (stat cards, client breakdown, recent pipeline runs).
 - **E2 ⏳:** Client digest email (confirm needed)
 - **E3 ⏳:** Billing/plan tracking (confirm needed)
 
-### Files Changed (A1)
+### Files Changed (key files, by layer)
+
 | File | Change |
 |------|--------|
-| `orchestrator/src/server/db/schema.ts` | Added `clientId` FK column to `stageEvents`, `tasks`, `jobNotes`, `jobDocuments`, `watchlistSelectedSources`, `postApplicationIntegrations` |
-| `orchestrator/src/server/db/migrate.ts` | Added `ensureAgencyClientColumns()` function with ALTER TABLE + backfill + indexes |
+| `orchestrator/src/server/db/schema.ts` | Added `clientId` FK column to `stageEvents`, `tasks`, `jobNotes`, `jobDocuments`, `watchlistSelectedSources`, `postApplicationIntegrations`; added `clients`, `workerClientAssignments`, `clientCredentials` tables |
+| `orchestrator/src/server/db/migrate.ts` | `ensureAgencyClientColumns()`, `ensureAgencyTables()`, `ensureClientCredentialsTable()`; reordered rebuild before client columns |
+| `orchestrator/src/server/tenancy/private-scope.ts` | `clientDataScopeFilter()`, `requireRole()`, `requireNonClientRole()` |
+| `orchestrator/src/server/repositories/jobs.ts` | Role-aware `jobsScopeFilter()` (admin/worker/client/member) |
+| `orchestrator/src/server/repositories/watchlist.ts` | `userScopedFilter()` always filters by userId; fixed seen-jobs id reuse |
+| `orchestrator/src/server/api/routes/clients.ts` | Client CRUD + create-login |
+| `orchestrator/src/server/api/routes/assignments.ts` | Worker↔client assignments |
+| `orchestrator/src/server/api/routes/client-credentials.ts` | Encrypted credential vault |
+| `orchestrator/src/server/api/routes/admin/stats.ts` | Admin reporting aggregations |
+| `orchestrator/src/server/api/routes/settings.ts` | `PATCH` gated to `isSystemAdmin()` |
+| `orchestrator/src/server/api/routes/database.ts` | `DELETE` gated to `isSystemAdmin()` |
+| `orchestrator/src/server/api/routes/jobs/maintenance.ts` | Bulk-delete gated to `isSystemAdmin()` |
+| `orchestrator/src/server/api/routes/workspaces.ts` | User creation defaults to `member`, accepts optional `role` |
+| `orchestrator/src/server/pipeline/steps/score-jobs.ts` | Concurrency=2, sequential scoring/brief |
+| `orchestrator/src/client/pages/agency/WorkerClientDashboardPage.tsx` | Expandable rows, posting link, PDF download, mark-applied |
+| `orchestrator/src/client/pages/SettingsPage.tsx` | Non-admin Settings read-only (Display only) |
+| `orchestrator/src/client/App.tsx` | Mobile sidebar toggle, `/my-jobs` client-restricted |
+| `orchestrator/src/client/components/AppSidebar.tsx` | Defensive sign-out |
 
 ## Validation
 
@@ -234,4 +266,8 @@ Before marking agency work complete:
 - [x] Client logs in, sees `/my-jobs` with their jobs
 - [x] Client account login from admin panel
 - [x] Client delete (permanent, not archive)
-- [ ] Existing features (Jobs, Settings, etc.) still work
+- [x] Existing features (Jobs, Settings, etc.) still work — type checks, build, and full test suite pass except 3 pre-existing failures (OnboardingCoach step-nav ×2, dataDir Windows short-name ×1)
+- [x] Workers cannot change settings / wipe DB / bulk-delete jobs (403 enforced server-side)
+- [x] Worker dashboard: review → apply → mark applied without leaving the page
+- [x] Mobile sidebar reachable via hamburger toggle below 1024px
+- [ ] PDF generation requires Typst binary on local setups (see Priority Build Queue #5)

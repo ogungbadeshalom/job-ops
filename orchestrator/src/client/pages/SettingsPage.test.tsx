@@ -80,6 +80,12 @@ vi.mock("sonner", () => ({
   },
 }));
 
+vi.mock("@client/lib/jwt", () => ({
+  isAdminFromToken: vi.fn().mockReturnValue(true),
+  getRoleFromToken: vi.fn().mockReturnValue("admin"),
+  getUsernameFromToken: vi.fn().mockReturnValue("test"),
+}));
+
 const baseSettings = createAppSettings({
   profileProjects: [
     {

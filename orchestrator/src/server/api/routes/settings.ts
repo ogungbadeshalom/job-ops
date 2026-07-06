@@ -1,6 +1,7 @@
 import {
   AppError,
   badRequest,
+  forbidden,
   serviceUnavailable,
   statusToCode,
   unauthorized,
@@ -8,7 +9,7 @@ import {
 } from "@infra/errors";
 import { asyncRoute, fail, ok } from "@infra/http";
 import { logger } from "@infra/logger";
-import { getRequestId } from "@infra/request-context";
+import { getRequestId, isSystemAdmin } from "@infra/request-context";
 import { isDemoMode, sendDemoBlocked } from "@server/config/demo";
 import { getSetting } from "@server/repositories/settings";
 import { enqueueAutoPdfRegenerationForSettingsChanges } from "@server/services/auto-pdf-regeneration";
@@ -296,6 +297,12 @@ settingsRouter.patch(
         res,
         "Saving settings is disabled in the public demo.",
         { route: "PATCH /api/settings" },
+      );
+    }
+    if (!isSystemAdmin()) {
+      return fail(
+        res,
+        forbidden("Administrator access is required to change settings"),
       );
     }
 
