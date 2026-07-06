@@ -41,7 +41,100 @@ https://github.com/user-attachments/assets/ec5bc249-aad5-41f2-b1ff-f7b3b6e6f7b8
 
 ---
 
-## Quick Start
+## Agency Platform
+
+This fork extends JobOps into a **multi-tenant agency platform** for job-application services. One admin manages multiple clients, assigns workers, and audits every application — all from the same self-hosted instance.
+
+### Three roles
+
+| Role | What they do | Landing page |
+|------|-------------|--------------|
+| **Admin** | Creates clients & workers, assigns workers to clients, configures LLM/credentials, audits all work | `/admin` |
+| **Worker** | Runs job searches per client, reviews jobs, generates tailored resumes, applies externally, marks status | `/agency/clients` |
+| **Client** | Read-only view of their own applications, downloads tailored resume PDFs, tracks status changes | `/my-jobs` |
+
+### Agency workflow
+
+```
+Admin          Worker                Client
+  │              │                     │
+  ├─ create ──►  │                     │
+  │  client      │                     │
+  ├─ create ──►  │                     │
+  │  worker      │                     │
+  ├─ assign  ──► │                     │
+  │  worker→client                    │
+  ├─ create   ─► │                     │
+  │  client login                      │
+  │              ├─ run pipeline ─► discovers jobs
+  │              │                     │
+  │              ├─ review jobs        │
+  │              ├─ download PDF       │
+  │              ├─ mark applied       │
+  │              │                     ├─ sees status
+  │              │                     │  updates
+  │              │                     ├─ downloads
+  │              │                     │  resume PDFs
+  ├─ audit all ──┤                     │
+  │  work (Work Log)                   │
+```
+
+### What's been upgraded
+
+**Multi-tenancy & role isolation**
+- Per-tenant data scoping across jobs, notes, documents, pipeline runs, watchlist, and post-application integrations
+- Role-aware job scoping: admin sees all tenant jobs, worker sees assigned clients' jobs, client sees own profile, member sees own
+- `requireNonClientRole()` / `requireRole()` guards on all mutation routes
+- Cross-tenant and cross-user regression test coverage (`role-isolation.test.ts`, `tenant-isolation.test.ts`)
+
+**Admin oversight**
+- **Work Log** (`/admin/work-log`): full audit trail of every job across all workers and clients — filter by client/worker/status, expandable rows showing worker notes, applied dates, platform source
+- **Agency Overview** (`/admin`): stat cards, jobs-by-status breakdown, per-client breakdown, recent pipeline runs
+- Client CRUD with permanent delete, worker account management, worker↔client assignments
+- Per-client **credential vault** (encrypted OAuth credentials)
+
+**Worker experience**
+- Client dashboard with **expandable rows**: job description, posting link, tailored resume PDF download, mark-applied for any non-applied status — no navigation to the admin orchestrator
+- Pipeline auto-associates discovered jobs with the worker's assigned client
+- Pipeline safety timeout (2 min) so the spinner never hangs forever
+- Failed pipeline runs now emit a terminal SSE event (visible to the worker)
+
+**Settings lockdown**
+- `PATCH /api/settings`, `DELETE /api/database`, bulk-delete jobs, and backups are **admin/owner only** (server-enforced 403)
+- Workers/clients see only Display Preferences (read-only) + own password change
+- Workers can run searches without admin settings (settings update skipped for non-admins)
+
+**Pipeline hardening**
+- Scoring concurrency reduced to 2 with sequential scoring/brief generation (fixes LLM provider 429 rate limits)
+- Search-terms validation before run
+- Guaranteed terminal SSE event on background failure
+
+**PDF generation**
+- Typst renderer support (install via `winget install --id Typst.Typst`)
+- `TYPST_BIN` / `TECTONIC_BIN` env var overrides for binary path
+- PDF renderer setting can be switched in admin Settings
+
+### Local setup for agency mode
+
+```bash
+git clone https://github.com/ogungbadeshalom/job-ops.git
+cd job-ops
+npm install
+npm --workspace orchestrator run db:migrate
+
+# Start both backend + frontend dev servers
+npm --workspace orchestrator run dev
+```
+
+- Backend: `http://localhost:3001`
+- Frontend: `http://localhost:5173`
+- For PDF generation, install Typst and set the renderer to `typst` (admin Settings → PDF, or directly in the DB)
+
+See [`AGENTS.md`](./AGENTS.md) for the full architecture, known bug fixes, and build-plan status.
+
+---
+
+## Quick Start (original single-user mode)
 
 Prefer a guided walkthrough? Follow the [Self-Hosting Guide](https://jobops.dakheera47.com/docs/getting-started/self-hosting).
 
