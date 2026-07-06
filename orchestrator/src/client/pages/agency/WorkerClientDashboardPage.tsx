@@ -7,10 +7,14 @@ import type { JobListItem } from "@shared/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Ban,
   Briefcase,
   Building2,
   CheckCircle2,
-  Clock,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  ExternalLink,
   Loader2,
   Play,
   Send,
@@ -18,7 +22,7 @@ import {
   UserRoundCheck,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, Fragment, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -31,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import * as agencyApi from "../../api/agency";
+import * as agencyApi from "@client/api/agency";
 
 interface PipelineProgressLike {
   step: string;
@@ -120,6 +124,14 @@ function StatCard({ icon: Icon, label, value, className }: StatCardProps) {
   );
 }
 
+function canMarkApplied(status: string): boolean {
+  return status !== "applied" && status !== "skipped" && status !== "expired";
+}
+
+function canSkip(status: string): boolean {
+  return status === "ready" || status === "discovered";
+}
+
 export const WorkerClientDashboardPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -139,6 +151,18 @@ export const WorkerClientDashboardPage: React.FC = () => {
   const { data: jobsResponse, isLoading: jobsLoading } = useQuery({
     queryKey: queryKeys.jobs.list({ view: "list", clientId: id }),
     queryFn: () => api.getJobs({ view: "list", clientId: id }),
+  });
+
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+
+  const {
+    data: expandedJob,
+    isLoading: expandedJobLoading,
+    isError: expandedJobError,
+  } = useQuery({
+    queryKey: queryKeys.jobs.detail(expandedJobId ?? ""),
+    queryFn: () => api.getJob(expandedJobId!),
+    enabled: Boolean(expandedJobId),
   });
 
   const applyMutation = useMutation({
@@ -169,16 +193,58 @@ export const WorkerClientDashboardPage: React.FC = () => {
     },
   });
 
+  const pdfMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const blob = await api.getJobPdfBlob(jobId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `resume-${jobId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    },
+    onSuccess: () => {
+      toast.success("PDF downloaded");
+    },
+    onError: (err) => {
+      showErrorToast(err, "Failed to download PDF");
+    },
+  });
+
   const [isPipelineRunning, setIsPipelineRunning] = useState(false);
   const pipelineJobsDiscoveredRef = useRef<number | null>(null);
+  const pipelineTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPipelineTimeout = useCallback(() => {
+    if (pipelineTimeoutRef.current) {
+      clearTimeout(pipelineTimeoutRef.current);
+      pipelineTimeoutRef.current = null;
+    }
+  }, []);
+
+  const startPipelineTimeout = () => {
+    clearPipelineTimeout();
+    pipelineTimeoutRef.current = setTimeout(() => {
+      setIsPipelineRunning(false);
+      toast.error(
+        "Pipeline did not report a result within 2 minutes. It may still be running in the background. If no jobs appear, check the server logs or the LLM configuration.",
+        { duration: 6000 },
+      );
+    }, 120_000);
+  };
 
   const pipelineMutation = useMutation({
     mutationFn: () => agencyApi.runPipelineForClient(id!),
     onSuccess: () => {
       setIsPipelineRunning(true);
+      startPipelineTimeout();
       toast.message("Pipeline started — searching for jobs...");
     },
     onError: (err) => {
+      setIsPipelineRunning(false);
+      clearPipelineTimeout();
       showErrorToast(err, "Failed to start pipeline");
     },
   });
@@ -192,6 +258,7 @@ export const WorkerClientDashboardPage: React.FC = () => {
 
           if (payload.step === "completed") {
             setIsPipelineRunning(false);
+            clearPipelineTimeout();
             const discovered =
               typeof payload.jobsDiscovered === "number"
                 ? payload.jobsDiscovered
@@ -208,6 +275,10 @@ export const WorkerClientDashboardPage: React.FC = () => {
             payload.step === "cancelled"
           ) {
             setIsPipelineRunning(false);
+            clearPipelineTimeout();
+            if (payload.step === "failed") {
+              toast.error(`Pipeline failed: ${payload.message ?? ""}`);
+            }
           }
 
           if (
@@ -220,8 +291,11 @@ export const WorkerClientDashboardPage: React.FC = () => {
       },
     );
 
-    return unsubscribe;
-  }, [id, queryClient]);
+    return () => {
+      unsubscribe();
+      clearPipelineTimeout();
+    };
+  }, [id, queryClient, clearPipelineTimeout]);
 
   if (!id) {
     return (
@@ -246,6 +320,10 @@ export const WorkerClientDashboardPage: React.FC = () => {
   };
 
   const jobs = jobsResponse?.jobs ?? [];
+
+  const toggleExpand = (jobId: string) => {
+    setExpandedJobId((prev) => (prev === jobId ? null : jobId));
+  };
 
   return (
     <>
@@ -341,8 +419,8 @@ export const WorkerClientDashboardPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Run a search pipeline for this client's jobs based on their
-                  configured search terms and preferences.
+                  Run a search pipeline for this client&apos;s jobs based on
+                  their configured search terms and preferences.
                 </p>
               </CardContent>
             </Card>
@@ -366,6 +444,7 @@ export const WorkerClientDashboardPage: React.FC = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-10" />
                           <TableHead>Job</TableHead>
                           <TableHead>Employer</TableHead>
                           <TableHead>Status</TableHead>
@@ -374,66 +453,209 @@ export const WorkerClientDashboardPage: React.FC = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {jobs.map((job: JobListItem) => (
-                          <TableRow key={job.id}>
-                            <TableCell className="max-w-[200px] truncate font-medium">
-                              {job.title}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {job.employer}
-                            </TableCell>
-                            <TableCell>
-                              <JobStatusBadge status={job.status} />
-                            </TableCell>
-                            <TableCell>
-                              {job.suitabilityScore != null
-                                ? `${job.suitabilityScore}%`
-                                : "—"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() =>
-                                    navigate(`/jobs/ready/${job.id}`)
-                                  }
-                                >
-                                  <Clock className="h-4 w-4" />
-                                  <span className="sr-only">View</span>
-                                </Button>
-                                {job.status === "ready" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-emerald-400"
-                                    disabled={applyMutation.isPending}
-                                    onClick={() => applyMutation.mutate(job.id)}
-                                  >
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    <span className="sr-only">
-                                      Mark Applied
-                                    </span>
-                                  </Button>
-                                )}
-                                {(job.status === "ready" ||
-                                  job.status === "discovered") && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-rose-400"
-                                    disabled={skipMutation.isPending}
-                                    onClick={() => skipMutation.mutate(job.id)}
-                                  >
-                                    <CheckCircle2 className="h-4 w-4 rotate-45" />
-                                    <span className="sr-only">Skip</span>
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {jobs.map((job: JobListItem) => {
+                          const isExpanded = expandedJobId === job.id;
+                          return (
+                            <Fragment key={job.id}>
+                              <TableRow
+                                className="cursor-pointer"
+                                onClick={() => toggleExpand(job.id)}
+                              >
+                                <TableCell className="w-10">
+                                  {isExpanded ? (
+                                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                </TableCell>
+                                <TableCell className="max-w-[200px] truncate font-medium">
+                                  {job.title}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {job.employer}
+                                </TableCell>
+                                <TableCell>
+                                  <JobStatusBadge status={job.status} />
+                                </TableCell>
+                                <TableCell>
+                                  {job.suitabilityScore != null
+                                    ? `${job.suitabilityScore}%`
+                                    : "—"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    {canMarkApplied(job.status) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-emerald-400"
+                                        disabled={applyMutation.isPending}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          applyMutation.mutate(job.id);
+                                        }}
+                                      >
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        <span className="sr-only">
+                                          Mark Applied
+                                        </span>
+                                      </Button>
+                                    )}
+                                    {canSkip(job.status) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-rose-400"
+                                        disabled={skipMutation.isPending}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          skipMutation.mutate(job.id);
+                                        }}
+                                      >
+                                        <Ban className="h-4 w-4" />
+                                        <span className="sr-only">Skip</span>
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                              {isExpanded && (
+                                <TableRow className="bg-muted/30">
+                                  <TableCell colSpan={6} className="p-0">
+                                    <div className="px-4 py-4">
+                                      {expandedJobLoading && (
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          Loading job details...
+                                        </div>
+                                      )}
+                                      {expandedJobError && (
+                                        <div className="text-sm text-destructive">
+                                          Could not load job details. Try again
+                                          or check the job in the main
+                                          orchestrator.
+                                        </div>
+                                      )}
+                                      {expandedJob && (
+                                        <div className="space-y-4">
+                                          <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold">
+                                              Description
+                                            </h4>
+                                            <p className="text-sm text-muted-foreground">
+                                              {expandedJob.jobDescription ||
+                                                "No description available."}
+                                            </p>
+                                          </div>
+
+                                          <div className="flex flex-wrap gap-2">
+                                            {(expandedJob.jobUrl ||
+                                              expandedJob.applicationLink) && (
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                asChild
+                                              >
+                                                <a
+                                                  href={
+                                                    expandedJob.applicationLink ||
+                                                    expandedJob.jobUrl
+                                                  }
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                >
+                                                  <ExternalLink className="mr-1 h-4 w-4" />
+                                                  Open posting
+                                                </a>
+                                              </Button>
+                                            )}
+                                            {expandedJob.pdfPath && (
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={pdfMutation.isPending}
+                                                onClick={() =>
+                                                  pdfMutation.mutate(
+                                                    expandedJob.id,
+                                                  )
+                                                }
+                                              >
+                                                <Download className="mr-1 h-4 w-4" />
+                                                Download resume PDF
+                                              </Button>
+                                            )}
+                                            {canMarkApplied(
+                                              expandedJob.status,
+                                            ) && (
+                                              <Button
+                                                variant="default"
+                                                size="sm"
+                                                disabled={
+                                                  applyMutation.isPending
+                                                }
+                                                onClick={() =>
+                                                  applyMutation.mutate(
+                                                    expandedJob.id,
+                                                  )
+                                                }
+                                              >
+                                                <CheckCircle2 className="mr-1 h-4 w-4" />
+                                                Mark Applied
+                                              </Button>
+                                            )}
+                                            {canSkip(expandedJob.status) && (
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={
+                                                  skipMutation.isPending
+                                                }
+                                                onClick={() =>
+                                                  skipMutation.mutate(
+                                                    expandedJob.id,
+                                                  )
+                                                }
+                                              >
+                                                <Ban className="mr-1 h-4 w-4" />
+                                                Skip
+                                              </Button>
+                                            )}
+                                          </div>
+
+                                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                                            {expandedJob.location && (
+                                              <span>
+                                                Location: {expandedJob.location}
+                                              </span>
+                                            )}
+                                            {expandedJob.salary && (
+                                              <span>
+                                                Salary: {expandedJob.salary}
+                                              </span>
+                                            )}
+                                            {expandedJob.datePosted && (
+                                              <span>
+                                                Posted:{" "}
+                                                {new Date(
+                                                  expandedJob.datePosted,
+                                                ).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                            {expandedJob.source && (
+                                              <span>
+                                                Source: {expandedJob.source}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </Fragment>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
