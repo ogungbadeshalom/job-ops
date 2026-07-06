@@ -32,7 +32,15 @@ export const AppSidebar: React.FC<{
   };
 
   const handleSignOut = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // Defensive: if logout fails for any reason, force a hard navigation to
+      // sign-in so the user is not left in a broken state.
+      if (typeof window !== "undefined") {
+        window.location.assign("/sign-in");
+      }
+    }
   };
 
   const navLinks = getNavLinks();

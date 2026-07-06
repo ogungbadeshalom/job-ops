@@ -1,6 +1,7 @@
 import { getRoleFromToken, isAdminFromToken } from "@client/lib/jwt";
 import {
   Building2,
+  ClipboardList,
   Columns3,
   Home,
   Inbox,
@@ -17,8 +18,7 @@ export type NavLink = {
   activePaths?: string[];
 };
 
-const SHARED_NAV: NavLink[] = [
-  { to: "/overview", label: "Overview", icon: Home },
+const WORKER_NAV: NavLink[] = [
   {
     to: "/jobs/ready",
     label: "Jobs",
@@ -27,11 +27,10 @@ const SHARED_NAV: NavLink[] = [
   },
   {
     to: "/applications/in-progress",
-    label: "In Progress",
+    label: "Pipeline Board",
     icon: Columns3,
     activePaths: ["/applications/in-progress"],
   },
-  { to: "/tracking-inbox", label: "Tracking Inbox", icon: Inbox },
 ];
 
 const AGENCY_NAV: NavLink[] = [
@@ -49,6 +48,12 @@ const ADMIN_NAV: NavLink[] = [
     label: "Overview",
     icon: Home,
     activePaths: [],
+  },
+  {
+    to: "/admin/work-log",
+    label: "Work Log",
+    icon: ClipboardList,
+    activePaths: ["/admin/work-log"],
   },
   {
     to: "/admin/clients",
@@ -82,19 +87,34 @@ export function getNavLinks(): NavLink[] {
     return CLIENT_NAV;
   }
 
-  const links = [...SHARED_NAV];
+  const settingsLabel = isAdmin ? "Settings" : "Account";
 
   if (isAdmin) {
-    links.push(...ADMIN_NAV);
+    return [
+      ...ADMIN_NAV,
+      {
+        to: "/jobs/ready",
+        label: "Jobs",
+        icon: LayoutDashboard,
+        activePaths: ["/jobs/ready", "/jobs/discovered", "/jobs/applied"],
+      },
+      {
+        to: "/applications/in-progress",
+        label: "Pipeline Board",
+        icon: Columns3,
+        activePaths: ["/applications/in-progress"],
+      },
+      { to: "/tracking-inbox", label: "Tracking Inbox", icon: Inbox },
+      { to: "/settings", label: settingsLabel, icon: Settings },
+    ];
   }
 
-  if (role !== "client") {
-    links.push(...AGENCY_NAV);
-  }
-
-  links.push({ to: "/settings", label: "Settings", icon: Settings });
-
-  return links;
+  // Workers (and members)
+  return [
+    ...AGENCY_NAV,
+    ...WORKER_NAV,
+    { to: "/settings", label: settingsLabel, icon: Settings },
+  ];
 }
 
 export const NAV_LINKS: NavLink[] = getNavLinks();

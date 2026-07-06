@@ -35,6 +35,16 @@ function resolveNextPath(rawNext: string | null): string {
   return rawNext;
 }
 
+function roleBasedLandingPath(
+  role: string | undefined,
+  isSystemAdmin: boolean,
+): string | null {
+  if (isSystemAdmin) return "/admin";
+  if (role === "worker") return "/agency/clients";
+  if (role === "client") return "/my-jobs";
+  return null;
+}
+
 export function SignInPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -88,9 +98,11 @@ export function SignInPage() {
           let target = nextPath;
           try {
             const context = await getCurrentAuthContext();
-            if (context.role === "client") {
-              target = "/my-jobs";
-            }
+            const landing = roleBasedLandingPath(
+              context.role,
+              context.user.isSystemAdmin,
+            );
+            if (landing) target = landing;
           } catch {
             // Fall back to default nextPath if auth context fetch fails
           }
@@ -157,9 +169,11 @@ export function SignInPage() {
       let target = nextPath;
       try {
         const context = await getCurrentAuthContext();
-        if (context.role === "client") {
-          target = "/my-jobs";
-        }
+        const landing = roleBasedLandingPath(
+          context.role,
+          context.user.isSystemAdmin,
+        );
+        if (landing) target = landing;
       } catch {
         // Fall back to default nextPath if auth context fetch fails
       }

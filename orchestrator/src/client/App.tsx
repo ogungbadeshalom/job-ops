@@ -2,7 +2,7 @@
  * Main App component.
  */
 
-import { X } from "lucide-react";
+import { X, Menu } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Navigate,
@@ -26,6 +26,33 @@ const AppSidebarWrapper: React.FC = () => {
   return <AppSidebar open={open} onClose={() => setOpen(false)} />;
 };
 
+const MobileSidebarToggle: React.FC = () => {
+  const { setOpen } = useSidebar();
+  const location = useLocation();
+  const isHidden =
+    location.pathname === "/sign-in" ||
+    location.pathname === "/onboarding" ||
+    location.pathname === "/offline";
+
+  if (isHidden) return null;
+
+  return (
+    <div className="sticky top-0 z-20 flex items-center gap-2 border-b bg-card px-4 py-2 lg:hidden">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9"
+        onClick={() => setOpen(true)}
+        aria-label="Open navigation menu"
+      >
+        <Menu className="h-5 w-5" />
+      </Button>
+      <span className="text-sm font-semibold">JobOps</span>
+    </div>
+  );
+};
+
 import { useAnalyticsIdentity } from "./hooks/useAnalyticsIdentity";
 import { useDemoInfo } from "./hooks/useDemoInfo";
 import { setAuthNavigator } from "./lib/auth-navigation";
@@ -34,6 +61,7 @@ import { AdminClientNewPage } from "./pages/admin/AdminClientNewPage";
 import { AdminClientsPage } from "./pages/admin/AdminClientsPage";
 import { AdminOverviewPage } from "./pages/admin/AdminOverviewPage";
 import { AdminWorkersPage } from "./pages/admin/AdminWorkersPage";
+import { AdminWorkLogPage } from "./pages/admin/AdminWorkLogPage";
 import { WorkerClientDashboardPage } from "./pages/agency/WorkerClientDashboardPage";
 import { WorkerClientsPage } from "./pages/agency/WorkerClientsPage";
 import { MyJobDetailPage } from "./pages/client/MyJobDetailPage";
@@ -124,6 +152,7 @@ export const App: React.FC = () => {
       <OnboardingGate />
       <AppSidebarWrapper />
       <div className="lg:ml-64">
+        <MobileSidebarToggle />
         {showDemoBanners && (
           <div className="sticky top-0 z-50 w-full border-b border-amber-400/50 bg-amber-500/20 px-4 py-2 text-xs text-amber-100 shadow-sm backdrop-blur">
             <div className="mx-auto flex items-center justify-center gap-3">
@@ -225,7 +254,11 @@ export const App: React.FC = () => {
                     />
                     <Route
                       path="/tracking-inbox"
-                      element={<TrackingInboxPage />}
+                      element={
+                        <AuthGuard requiredRole="admin">
+                          <TrackingInboxPage />
+                        </AuthGuard>
+                      }
                     />
                     <Route path="/watchlist" element={<WatchlistPage />} />
                     <Route
@@ -281,6 +314,14 @@ export const App: React.FC = () => {
                       element={
                         <AuthGuard requiredRole="admin">
                           <AdminWorkersPage />
+                        </AuthGuard>
+                      }
+                    />
+                    <Route
+                      path="/admin/work-log"
+                      element={
+                        <AuthGuard requiredRole="admin">
+                          <AdminWorkLogPage />
                         </AuthGuard>
                       }
                     />
