@@ -9,7 +9,7 @@ import type { Job } from "@shared/types";
 import { progressHelpers, updateProgress } from "../progress";
 import type { ScoredJob } from "./types";
 
-const SCORING_CONCURRENCY = 4;
+const SCORING_CONCURRENCY = 2;
 
 export async function scoreJobsStep(args: {
   profile: Record<string, unknown>;
@@ -66,13 +66,10 @@ export async function scoreJobsStep(args: {
         return;
       }
 
-      const scoringResultPromise = scoringInstructions
-        ? scoreJobSuitability(job, args.profile, { scoringInstructions })
-        : scoreJobSuitability(job, args.profile);
-      const [{ score, reason }, jobBrief] = await Promise.all([
-        scoringResultPromise,
-        generateJobBrief(job.jobDescription, { jobId: job.id }),
-      ]);
+      const { score, reason } = scoringInstructions
+        ? await scoreJobSuitability(job, args.profile, { scoringInstructions })
+        : await scoreJobSuitability(job, args.profile);
+      const jobBrief = await generateJobBrief(job.jobDescription, { jobId: job.id });
       if (args.shouldCancel?.()) return;
 
       let sponsorMatchScore = 0;

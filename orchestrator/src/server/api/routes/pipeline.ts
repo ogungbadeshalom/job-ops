@@ -12,6 +12,7 @@ import { fail, ok, okWithMeta } from "@infra/http";
 import { logger } from "@infra/logger";
 import {
   getUserId,
+  getRole,
   isSystemAdmin,
   runWithRequestContext,
 } from "@infra/request-context";
@@ -32,10 +33,14 @@ import {
   runPipeline,
   subscribeToProgress,
 } from "@server/pipeline/index";
+import { progressHelpers } from "@server/pipeline/progress";
 import { getClientById } from "@server/repositories/clients";
 import * as pipelineRepo from "@server/repositories/pipeline";
 import * as pipelineSearchPresetsRepo from "@server/repositories/pipeline-search-presets";
-import { isWorkerAssignedToClient } from "@server/repositories/worker-assignments";
+import {
+  getAssignedClientIdsForWorker,
+  isWorkerAssignedToClient,
+} from "@server/repositories/worker-assignments";
 import { trackCanonicalActivationEvent } from "@server/services/activation-funnel";
 import {
   buildChallengeViewerUrl,
@@ -468,6 +473,25 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
     let resolvedWorkplaceTypes = config.workplaceTypes;
     let resolvedCityLocations = config.cityLocations;
 
+    // Auto-associate the run with a worker's single assigned client when no
+    // clientId was provided (e.g. main orchestrator "Run search"). With more
+    // than one assignment the worker must use a specific client dashboard.
+    if (!config.clientId && getRole() === "worker") {
+      const currentUserId = getUserId();
+      if (currentUserId) {
+        const assignedClientIds = await getAssignedClientIdsForWorker(
+          currentUserId,
+        );
+        if (assignedClientIds.length === 1) {
+          config.clientId = assignedClientIds[0];
+          logger.info(
+            "Auto-associated pipeline run with single assigned client",
+            { clientId: config.clientId, workerId: currentUserId },
+          );
+        }
+      }
+    }
+
     if (config.clientId) {
       const client = await getClientById(config.clientId);
       if (!client) {
@@ -598,6 +622,19 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
     const searchTermsState = await ensurePipelineSearchTerms({
       requestedSearchTerms: resolvedSearchTerms ?? config.searchTerms,
     });
+
+    if (
+      searchTermsState.searchTermsCount === null ||
+      searchTermsState.searchTermsCount === 0
+    ) {
+      return fail(
+        res,
+        badRequest(
+          "No search terms available. Configure search terms in the client profile or tenant settings before running the pipeline.",
+        ),
+      );
+    }
+
     const pipelineUsage = await reserveHostedUsage({
       action: "pipeline_run",
     });
@@ -618,7 +655,10 @@ pipelineRouter.post("/run", async (req: Request, res: Response) => {
           hostedUsageReservationId: pipelineUsage.reservation?.id ?? null,
         },
       ).catch((error) => {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
         logger.error("Background pipeline run failed", error);
+        progressHelpers.failed(message);
       });
     });
     void trackCanonicalActivationEvent(

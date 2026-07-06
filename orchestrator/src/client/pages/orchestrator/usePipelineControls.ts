@@ -1,6 +1,7 @@
 import * as api from "@client/api";
 import type { ManualImportResult } from "@client/components/ManualImportFlow";
 import { useSettings } from "@client/hooks/useSettings";
+import { isAdminFromToken } from "@client/lib/jwt";
 import {
   createLocationIntent,
   planLocationSources,
@@ -198,22 +199,24 @@ export function usePipelineControls(
         const searchCities = serializeCityLocationsSetting(
           values.cityLocations,
         );
-        await api.updateSettings({
-          searchTerms: values.searchTerms,
-          workplaceTypes: values.workplaceTypes,
-          locationSearchScope: values.searchScope,
-          locationMatchStrictness: values.matchStrictness,
-          jobspyResultsWanted: limits.jobspyResultsWanted,
-          gradcrackerMaxJobsPerTerm: limits.gradcrackerMaxJobsPerTerm,
-          ukvisajobsMaxJobs: limits.ukvisajobsMaxJobs,
-          adzunaMaxJobsPerTerm: limits.adzunaMaxJobsPerTerm,
-          startupjobsMaxJobsPerTerm: limits.startupjobsMaxJobsPerTerm,
-          jobindexMaxJobsPerTerm: limits.jobindexMaxJobsPerTerm,
-          seekMaxJobsPerTerm: limits.seekMaxJobsPerTerm,
-          naukriMaxJobsPerTerm: limits.naukriMaxJobsPerTerm,
-          jobspyCountryIndeed: values.country,
-          searchCities,
-        });
+        if (isAdminFromToken()) {
+          await api.updateSettings({
+            searchTerms: values.searchTerms,
+            workplaceTypes: values.workplaceTypes,
+            locationSearchScope: values.searchScope,
+            locationMatchStrictness: values.matchStrictness,
+            jobspyResultsWanted: limits.jobspyResultsWanted,
+            gradcrackerMaxJobsPerTerm: limits.gradcrackerMaxJobsPerTerm,
+            ukvisajobsMaxJobs: limits.ukvisajobsMaxJobs,
+            adzunaMaxJobsPerTerm: limits.adzunaMaxJobsPerTerm,
+            startupjobsMaxJobsPerTerm: limits.startupjobsMaxJobsPerTerm,
+            jobindexMaxJobsPerTerm: limits.jobindexMaxJobsPerTerm,
+            seekMaxJobsPerTerm: limits.seekMaxJobsPerTerm,
+            naukriMaxJobsPerTerm: limits.naukriMaxJobsPerTerm,
+            jobspyCountryIndeed: values.country,
+            searchCities,
+          });
+        }
         await refreshSettings();
         await startPipelineRun({
           ...values,

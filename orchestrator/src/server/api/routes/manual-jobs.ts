@@ -8,9 +8,11 @@ import {
 } from "@infra/errors";
 import { fail, ok } from "@infra/http";
 import { logger } from "@infra/logger";
+import { getRole, getUserId } from "@infra/request-context";
 import { processJob } from "@server/pipeline/index";
 import * as jobsRepo from "@server/repositories/jobs";
 import { getSetting } from "@server/repositories/settings";
+import { getAssignedClientIdsForWorker } from "@server/repositories/worker-assignments";
 import { generateJobBrief } from "@server/services/job-brief";
 import { inferManualJobDetails } from "@server/services/manualJob";
 import { getProfile } from "@server/services/profile";
@@ -298,6 +300,24 @@ manualJobsRouter.post("/import", async (req: Request, res: Response) => {
       }
     }
 
+    // Auto-associate manually imported jobs with a worker's single assigned client.
+    let resolvedClientId: string | undefined;
+    if (getRole() === "worker") {
+      const currentUserId = getUserId();
+      if (currentUserId) {
+        const assignedClientIds = await getAssignedClientIdsForWorker(
+          currentUserId,
+        );
+        if (assignedClientIds.length === 1) {
+          resolvedClientId = assignedClientIds[0];
+          logger.info(
+            "Auto-associated manual import with single assigned client",
+            { clientId: resolvedClientId, workerId: currentUserId },
+          );
+        }
+      }
+    }
+
     const createdJob = await jobsRepo.createJob({
       source,
       sourceJobId: sourceJobId ?? undefined,
@@ -315,6 +335,7 @@ manualJobsRouter.post("/import", async (req: Request, res: Response) => {
       disciplines: cleanOptional(job.disciplines) ?? undefined,
       degreeRequired: cleanOptional(job.degreeRequired) ?? undefined,
       starting: cleanOptional(job.starting) ?? undefined,
+      clientId: resolvedClientId,
     });
 
     const skipTailoring = await resolveSkipTailoring(input.skipTailoring);

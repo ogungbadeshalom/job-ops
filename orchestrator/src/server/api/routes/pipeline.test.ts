@@ -831,7 +831,7 @@ describe.sequential("Pipeline API routes", () => {
         "Content-Type": "application/json",
         "x-request-id": "quota-pipeline-run",
       },
-      body: JSON.stringify({ sources: ["gradcracker"] }),
+      body: JSON.stringify({ sources: ["gradcracker"], searchTerms: ["engineer"] }),
     });
     const body = await res.json();
 
