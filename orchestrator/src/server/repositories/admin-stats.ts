@@ -97,3 +97,76 @@ export async function getAdminStats(tenantId: string): Promise<AdminStats> {
     recentPipelineRuns,
   };
 }
+
+export type AuditJobRow = {
+  id: string;
+  title: string;
+  employer: string;
+  source: string | null;
+  jobUrl: string | null;
+  status: string;
+  appliedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  userId: string | null;
+  workerName: string | null;
+  clientId: string | null;
+  clientName: string | null;
+  noteCount: number;
+};
+
+export type JobAuditResult = {
+  jobs: AuditJobRow[];
+  total: number;
+};
+
+export function getAdminJobAudit(args: {
+  tenantId: string;
+  clientId?: string;
+  workerId?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): JobAuditResult {
+  const { tenantId, clientId, workerId, status, limit = 50, offset = 0 } = args;
+
+  const conditions: string[] = ["j.tenant_id = ?"];
+  const params: (string | number)[] = [tenantId];
+
+  if (clientId) {
+    conditions.push("j.client_id = ?");
+    params.push(clientId);
+  }
+  if (workerId) {
+    conditions.push("j.user_id = ?");
+    params.push(workerId);
+  }
+  if (status) {
+    conditions.push("j.status = ?");
+    params.push(status);
+  }
+
+  const where = conditions.join(" AND ");
+
+  const { count: total } = rawDb
+    .prepare(`SELECT count(*) as count FROM jobs j WHERE ${where}`)
+    .get(...params) as { count: number };
+
+  const jobs = rawDb
+    .prepare(
+      `SELECT j.id, j.title, j.employer, j.source, j.job_url, j.status,
+              j.applied_at as appliedAt, j.created_at as createdAt, j.updated_at as updatedAt,
+              j.user_id as userId, u.display_name as workerName,
+              j.client_id as clientId, c.name as clientName,
+              (SELECT count(*) FROM job_notes n WHERE n.job_id = j.id) as noteCount
+       FROM jobs j
+       LEFT JOIN users u ON u.id = j.user_id
+       LEFT JOIN clients c ON c.id = j.client_id
+       WHERE ${where}
+       ORDER BY j.updated_at DESC
+       LIMIT ? OFFSET ?`,
+    )
+    .all(...params, limit, offset) as AuditJobRow[];
+
+  return { jobs, total };
+}

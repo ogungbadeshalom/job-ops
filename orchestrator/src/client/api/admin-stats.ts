@@ -33,3 +33,48 @@ export interface AdminStats {
 export async function fetchAdminStats(): Promise<AdminStats> {
   return fetchApi<AdminStats>("/admin/stats");
 }
+
+export interface AuditJobRow {
+  id: string;
+  title: string;
+  employer: string;
+  source: string | null;
+  jobUrl: string | null;
+  status: string;
+  appliedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  userId: string | null;
+  workerName: string | null;
+  clientId: string | null;
+  clientName: string | null;
+  noteCount: number;
+}
+
+export interface JobAuditResult {
+  jobs: AuditJobRow[];
+  total: number;
+}
+
+export interface JobAuditParams {
+  clientId?: string;
+  workerId?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function fetchAdminJobAudit(
+  params: JobAuditParams = {},
+): Promise<JobAuditResult> {
+  const query = new URLSearchParams();
+  if (params.clientId) query.set("clientId", params.clientId);
+  if (params.workerId) query.set("workerId", params.workerId);
+  if (params.status) query.set("status", params.status);
+  if (params.limit != null) query.set("limit", String(params.limit));
+  if (params.offset != null) query.set("offset", String(params.offset));
+  const qs = query.toString();
+  return fetchApi<JobAuditResult>(
+    `/admin/stats/job-audit${qs ? `?${qs}` : ""}`,
+  );
+}
