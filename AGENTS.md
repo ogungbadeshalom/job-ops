@@ -163,9 +163,9 @@ Three roles for the agency use case:
 
 | Admin | Worker | Client |
 |-------|--------|--------|
-| Overview, Jobs, In Progress, **Clients**, **Workers**, **My Clients**, Tracking Inbox, Settings | Overview, Jobs, In Progress, **My Clients**, Tracking Inbox, Settings | My Jobs |
+| Overview, **Work Log**, **Clients**, **Workers**, Jobs, Tracking Inbox, Settings | **My Clients**, Jobs, Account | My Jobs, Account |
 
-Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume (code kept, not in UI).
+Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume, Pipeline Board, Overview (HomePage) for workers (code kept, not in UI).
 
 ## Design Decisions
 
@@ -180,6 +180,13 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume (code ke
 - **Pipeline fallback for non-admin Run** — `usePipelineControls` skips `updateSettings` for non-admins so workers can run searches without admin settings.
 - **Scoring concurrency = 2** — reduced from 4 to avoid LLM provider 429s; scoring + brief generation run sequentially, not in parallel.
 - **Worker dashboard inline** — expandable rows with posting link, PDF download, mark-applied for any non-applied status; no navigation to the admin orchestrator.
+- **Pipeline Board removed** — the `/applications/in-progress` Kanban view was redundant with the Jobs table; route now redirects to `/jobs/ready`. Page component kept as dead code.
+- **Role-based landing pages** — admin → `/admin`, worker → `/agency/clients`, client → `/my-jobs` (via `roleBasedLandingPath` in SignInPage).
+- **Tracking Inbox admin-only** — `/tracking-inbox` gated to `requiredRole="admin"`; workers no longer see it.
+- **Settings → "Account" for non-admins** — non-admins see "Account" in nav (not "Settings") since they only have Display Preferences + own password.
+- **Admin Work Log** — `/admin/work-log` shows every job across all workers/clients with filters (client, worker, status) and expandable notes.
+- **Auto-associate worker jobs to client** — pipeline runs and manual imports auto-tag `clientId` when a worker has exactly one assigned client.
+- **Email client attribution** — `post_application_messages.client_id` propagated from matched job; admin Tracking Inbox shows violet client-name badge per email. One Gmail connection (admin's) serves all clients via forwarding; no per-client OAuth needed.
 
 ## Known Bug Fixes
 
@@ -200,6 +207,9 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume (code ke
 15. **AdminOverviewPage referenced non-existent server fields** — used `clientBreakdown`/`recentRuns`/`activeClients` but server returned `clients`/`recentPipelineRuns`/no-active-clients. Fixed: aligned client types to server, added `activeClients` count and `clientName` join.
 16. **Scoring hit LLM 429 (8 concurrent calls)** — `SCORING_CONCURRENCY=4` × 2 parallel LLM calls exceeded provider's limit of 4. Fixed: concurrency=2 + sequential scoring/brief generation.
 17. **Worker dashboard "View" ejected into admin orchestrator** — showed all clients' jobs with no agency context. Fixed: replaced with inline expandable rows (description, posting link, PDF download, mark-applied).
+18. **Jobs not associated with client** — worker ran pipeline via main orchestrator (no `clientId`), so client saw nothing. Fixed: auto-associate runs/imports with worker's single assigned client; backfilled existing jobs.
+19. **Tracking Inbox lacked client context** — emails matched to jobs but no client attribution shown. Fixed: added `client_id` to `post_application_messages`, propagated from matched job, displayed as violet badge in admin inbox.
+20. **Pipeline Board redundant** — duplicated Jobs table with no agency value. Fixed: removed from all navs and routes; redirects to `/jobs/ready`.
 
 ## Priority Build Queue (Current)
 
@@ -246,16 +256,26 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume (code ke
 | `orchestrator/src/server/api/routes/clients.ts` | Client CRUD + create-login |
 | `orchestrator/src/server/api/routes/assignments.ts` | Worker↔client assignments |
 | `orchestrator/src/server/api/routes/client-credentials.ts` | Encrypted credential vault |
-| `orchestrator/src/server/api/routes/admin/stats.ts` | Admin reporting aggregations |
+| `orchestrator/src/server/api/routes/admin/stats.ts` | Admin reporting aggregations + `GET /stats/job-audit` work log route |
+| `orchestrator/src/server/repositories/admin-stats.ts` | `getAdminStats()` + `getAdminJobAudit()` with filters/pagination |
+| `orchestrator/src/client/pages/admin/AdminWorkLogPage.tsx` | Admin Work Log page (filterable audit table, expandable notes) |
+| `orchestrator/src/server/repositories/post-application-messages.ts` | `client_id` auto-propagated from matched job on upsert |
+| `orchestrator/src/server/services/post-application/review/service.ts` | Inbox builder resolves client names from matched jobs |
+| `orchestrator/src/server/repositories/clients.ts` | `getClientNamesByIds()` helper |
+| `orchestrator/src/client/components/navigation.ts` | Role-based nav (Pipeline Board removed, Work Log added) |
+| `orchestrator/src/client/pages/SignInPage.tsx` | `roleBasedLandingPath()` for role-based redirects |
 | `orchestrator/src/server/api/routes/settings.ts` | `PATCH` gated to `isSystemAdmin()` |
 | `orchestrator/src/server/api/routes/database.ts` | `DELETE` gated to `isSystemAdmin()` |
 | `orchestrator/src/server/api/routes/jobs/maintenance.ts` | Bulk-delete gated to `isSystemAdmin()` |
 | `orchestrator/src/server/api/routes/workspaces.ts` | User creation defaults to `member`, accepts optional `role` |
+| `orchestrator/src/server/api/routes/manual-jobs.ts` | Auto-associate manual imports with worker's client |
 | `orchestrator/src/server/pipeline/steps/score-jobs.ts` | Concurrency=2, sequential scoring/brief |
+| `orchestrator/src/server/api/routes/pipeline.ts` | Auto-associate runs with worker's client; failed SSE event; search-terms validation |
 | `orchestrator/src/client/pages/agency/WorkerClientDashboardPage.tsx` | Expandable rows, posting link, PDF download, mark-applied |
 | `orchestrator/src/client/pages/SettingsPage.tsx` | Non-admin Settings read-only (Display only) |
-| `orchestrator/src/client/App.tsx` | Mobile sidebar toggle, `/my-jobs` client-restricted |
+| `orchestrator/src/client/App.tsx` | Mobile sidebar toggle, `/my-jobs` client-restricted, Pipeline Board route removed |
 | `orchestrator/src/client/components/AppSidebar.tsx` | Defensive sign-out |
+| `orchestrator/src/client/pages/tracking-inbox/EmailViewerList.tsx` | Client name badge per email |
 
 ## Validation
 
@@ -270,4 +290,8 @@ Before marking agency work complete:
 - [x] Workers cannot change settings / wipe DB / bulk-delete jobs (403 enforced server-side)
 - [x] Worker dashboard: review → apply → mark applied without leaving the page
 - [x] Mobile sidebar reachable via hamburger toggle below 1024px
+- [x] Pipeline Board removed from all navs; redirects to Jobs
+- [x] Admin Work Log shows every job with worker/client/status/notes
+- [x] Role-based landing pages (admin→/admin, worker→/agency/clients, client→/my-jobs)
+- [x] Email client attribution: matched emails show client name in admin inbox
 - [ ] PDF generation requires Typst binary on local setups (see Priority Build Queue #5)
