@@ -187,6 +187,14 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume, Pipelin
 - **Admin Work Log** — `/admin/work-log` shows every job across all workers/clients with filters (client, worker, status) and expandable notes.
 - **Auto-associate worker jobs to client** — pipeline runs and manual imports auto-tag `clientId` when a worker has exactly one assigned client.
 - **Email client attribution** — `post_application_messages.client_id` propagated from matched job; admin Tracking Inbox shows violet client-name badge per email. One Gmail connection (admin's) serves all clients via forwarding; no per-client OAuth needed.
+- **Chromeless routes** — sign-in, onboarding, and offline pages bypass the sidebar layout entirely (no `lg:ml-64` margin, no mobile toggle) so they center correctly on all viewports.
+- **JobSpy hardened** — Python venv with retry+backoff (3 retries, 5s→10s→20s+jitter), inter-term delay (2s configurable), existing-URL dedup, proxy support (`JOBSPY_PROXY_URL`), lazy description fetching (auto-off for runs >50), and venv health check on startup.
+- **Configurable pipeline yield** — `pipelineTopN` (default 50, 1-200) and `pipelineMinSuitabilityScore` (default 30, 0-100) are persisted settings in admin Settings → Scoring; pipeline reads them from DB; API `topN` max raised 50→200.
+- **Broader default sources** — 9 free sources enabled by default (gradcracker, indeed, linkedin, ukvisajobs, hiringcafe, golangjobs, startupjobs, workingnomads, wazzuf); paid/API-key sources (adzuna, seek) stay opt-in.
+- **Admin can't search** — Run/Manual Import buttons hidden from admin on the orchestrator via `isAdminFromToken()`; admin sees jobs for oversight only.
+- **Client badges on orchestrator** — when admin views `/jobs/ready`, each job row shows a violet client-name badge via `ClientNameContext` (React context, fetched once from admin stats).
+- **Stale-lock recovery** — pipeline tracks `startedAt`; if a run is "running" for >10 min, the next run attempt force-clears the lock (prevents permanent block after crashes).
+- **Workers page role-filtered** — excludes client logins (managed via Clients page); badge shows actual role (Admin/Owner/Worker); `listUsers()` now returns `role` from `tenant_memberships`.
 
 ## Known Bug Fixes
 
@@ -210,6 +218,10 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume, Pipelin
 18. **Jobs not associated with client** — worker ran pipeline via main orchestrator (no `clientId`), so client saw nothing. Fixed: auto-associate runs/imports with worker's single assigned client; backfilled existing jobs.
 19. **Tracking Inbox lacked client context** — emails matched to jobs but no client attribution shown. Fixed: added `client_id` to `post_application_messages`, propagated from matched job, displayed as violet badge in admin inbox.
 20. **Pipeline Board redundant** — duplicated Jobs table with no agency value. Fixed: removed from all navs and routes; redirects to `/jobs/ready`.
+21. **Workers page showed client logins as "Worker"** — `AdminWorkersPage` displayed ALL non-admin users with a generic "Worker" badge; `listUsers()` didn't return `role`. Fixed: `listUsers()` now selects `tenant_memberships.role`; Workers page filters to admin/owner/worker only; badge shows actual role.
+22. **Pipeline stuck at 5% (stale lock)** — if a pipeline run crashed or hung, `tenantState.isRunning` stayed `true` forever, blocking all future runs. Fixed: stale-lock recovery — if a run is "running" for >10 min, the next attempt force-clears the lock with a warning log.
+23. **OfflinePage "Try again" trapped on /offline** — button called `window.location.reload()` which reloaded `/offline`. Fixed: uses `navigate("/", { replace: true })` to leave the offline page.
+24. **Sign-in form not centered** — rendered inside the sidebar layout (`lg:ml-64` offset). Fixed: chromeless routes bypass the sidebar entirely via `isChromeless` flag in `App.tsx`.
 
 ## Priority Build Queue (Current)
 
@@ -217,7 +229,10 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume, Pipelin
 2. ✅ Wire pipeline "Run" button (with SSE progress)
 3. ✅ Onboarding edge cases — `OnboardingGate` now skips redirect for non-admin users (workers/clients bypass the wizard). `OnboardingCoach` step-nav tests are pre-existing failures, not blockers.
 4. ⏳ IMAP (deferred)
-5. ⏳ PDF generation requires Typst binary on local setups (`winget install --id Typst.Typst`, renderer set to `typst`). `TECTONIC_BIN`/`TYPST_BIN` env vars override the binary path.
+5. ✅ PDF generation requires Typst binary on local setups (`winget install --id Typst.Typst`, renderer set to `typst`). `TECTONIC_BIN`/`TYPST_BIN` env vars override the binary path.
+6. ✅ JobSpy venv installed + hardened (retry, delay, dedup, proxy, lazy descriptions, health check)
+7. ✅ Configurable pipeline yield (`pipelineTopN` + `pipelineMinSuitabilityScore` in admin Settings → Scoring)
+8. ✅ Stale-lock recovery (10min timeout) for pipeline runs
 
 ## Multi-Stage Build Plan
 
@@ -276,6 +291,21 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume, Pipelin
 | `orchestrator/src/client/App.tsx` | Mobile sidebar toggle, `/my-jobs` client-restricted, Pipeline Board route removed |
 | `orchestrator/src/client/components/AppSidebar.tsx` | Defensive sign-out |
 | `orchestrator/src/client/pages/tracking-inbox/EmailViewerList.tsx` | Client name badge per email |
+| `orchestrator/src/client/pages/OfflinePage.tsx` | "Try again" navigates away instead of reloading |
+| `orchestrator/src/client/pages/SignInPage.tsx` | Centered layout, brand mark, chromeless |
+| `orchestrator/src/client/pages/OrchestratorPage.tsx` | Admin Run button hidden; ClientNameContext provider |
+| `orchestrator/src/client/pages/orchestrator/ClientNameContext.ts` | React context for client name lookup |
+| `orchestrator/src/client/pages/orchestrator/JobRowContent.tsx` | Client badge on admin job rows |
+| `orchestrator/src/client/pages/admin/AdminWorkersPage.tsx` | Role-filtered (excludes client logins), actual role badge |
+| `orchestrator/src/client/pages/settings/components/ScoringSettingsSection.tsx` | Pipeline yield fields (topN, minScore) |
+| `orchestrator/src/server/repositories/users.ts` | `listUsers()` + `getUserById()` now return `role` |
+| `orchestrator/src/server/extractors/registry.ts` | JobSpy venv health check on startup |
+| `orchestrator/src/server/pipeline/orchestrator.ts` | Stale-lock recovery; reads pipeline settings; 9 default sources |
+| `extractors/jobspy/scrape_jobs.py` | Retry+backoff, proxy support, lazy description fetching |
+| `extractors/jobspy/src/run.ts` | Inter-term delay, existing-URL dedup |
+| `extractors/jobspy/manifest.ts` | `getExistingJobUrls()` deduplication |
+| `shared/src/settings-registry.ts` | `pipelineTopN`, `pipelineMinSuitabilityScore` settings |
+| `shared/src/types/jobs.ts` | `clientId` added to `Job` + `JobListItem` |
 
 ## Validation
 
@@ -294,4 +324,10 @@ Before marking agency work complete:
 - [x] Admin Work Log shows every job with worker/client/status/notes
 - [x] Role-based landing pages (admin→/admin, worker→/agency/clients, client→/my-jobs)
 - [x] Email client attribution: matched emails show client name in admin inbox
+- [x] JobSpy venv installed; retry, delay, dedup, proxy, lazy descriptions, health check
+- [x] Configurable pipeline yield (topN + minScore in admin Settings → Scoring)
+- [x] Stale-lock recovery (10min timeout) prevents permanent pipeline block
+- [x] Admin can't trigger searches (Run button hidden); client badges on job rows
+- [x] Workers page excludes client logins; shows actual role badges
+- [x] Sign-in form centered via chromeless routes
 - [ ] PDF generation requires Typst binary on local setups (see Priority Build Queue #5)
