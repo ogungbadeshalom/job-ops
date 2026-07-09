@@ -5,8 +5,10 @@
 import "./config/env";
 import { logger } from "@infra/logger";
 import { sanitizeUnknown } from "@infra/sanitize";
+import { closeDb } from "@server/db";
 import { createApp } from "./app";
 import { initializeExtractorRegistry } from "./extractors/registry";
+import { recoverStalePipelineRuns } from "./pipeline";
 import { deleteExpiredOrRevokedAuthSessions } from "./repositories/auth-sessions";
 import * as settingsRepo from "./repositories/settings";
 import { initializeActivationAnalyticsSafely } from "./services/activation-funnel";
@@ -60,27 +62,28 @@ async function startServer() {
   const app = createApp();
   const PORT = process.env.PORT || 3001;
 
+  try {
+    await recoverStalePipelineRuns();
+  } catch (error) {
+    logger.warn("Failed to recover stale pipeline runs", {
+      error: sanitizeUnknown(error),
+    });
+  }
+
   // Start server
   const server = app.listen(PORT, async () => {
-    console.log(`
-╔═══════════════════════════════════════════════════════════╗
-║                                                           ║
-║   🚀 Job Ops Orchestrator                                 ║
-║                                                           ║
-║   Server running at: http://localhost:${PORT}               ║
-║                                                           ║
-║   API:     http://localhost:${PORT}/api                     ║
-║   Health:  http://localhost:${PORT}/health                  ║
-║   PDFs:    http://localhost:${PORT}/pdfs                    ║
-║                                                           ║
-╚═══════════════════════════════════════════════════════════╝
-  `);
+    logger.info("Job Ops Orchestrator server started", {
+      port: PORT,
+      apiUrl: `http://localhost:${PORT}/api`,
+      healthUrl: `http://localhost:${PORT}/health`,
+      pdfUrl: `http://localhost:${PORT}/pdfs`,
+    });
 
     // Initialize visa sponsors service (downloads data if needed, starts scheduler)
     try {
       if (process.env.DEMO_MODE === "true") {
-        console.log(
-          "ℹ️ Demo mode enabled. Skipping visa sponsors initialization.",
+        logger.info(
+          "Demo mode enabled. Skipping visa sponsors initialization.",
         );
       } else {
         await initializeVisaSponsors();
@@ -118,12 +121,13 @@ async function startServer() {
 
       const settings = getBackupSettings();
       if (settings.enabled) {
-        console.log(
-          `✅ Backup scheduler started (hour: ${settings.hour}, max: ${settings.maxCount})`,
-        );
+        logger.info("Backup scheduler started", {
+          hour: settings.hour,
+          maxCount: settings.maxCount,
+        });
       } else {
-        console.log(
-          "ℹ️ Backups disabled. Enable in settings to schedule automatic backups.",
+        logger.info(
+          "Backups disabled. Enable in settings to schedule automatic backups.",
         );
       }
     } catch (error) {
@@ -155,6 +159,19 @@ async function startServer() {
     void initializeActivationAnalyticsSafely();
   });
   attachChallengeViewerUpgradeProxy(server);
+
+  function shutdownGracefully(signal: "SIGTERM" | "SIGINT") {
+    logger.info(`${signal} received, shutting down gracefully`);
+    server.close(() => {
+      closeDb();
+      process.exit(0);
+    });
+    // Force exit after 10s if connections don't close.
+    setTimeout(() => process.exit(1), 10_000).unref();
+  }
+
+  process.on("SIGTERM", () => shutdownGracefully("SIGTERM"));
+  process.on("SIGINT", () => shutdownGracefully("SIGINT"));
 }
 
 void startServer();

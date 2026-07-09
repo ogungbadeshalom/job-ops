@@ -24,6 +24,22 @@ export type ClientCredentialResponse = {
   clientId: string;
   provider: string;
   email: string;
+  accessToken: string | null;
+  hasAccessToken: boolean;
+  refreshToken: boolean;
+  hasRefreshToken: boolean;
+  clientSecret: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ClientCredentialDecryptedValues = {
+  id: string;
+  tenantId: string;
+  clientId: string;
+  provider: string;
+  email: string;
   accessToken: string;
   refreshToken: string | null;
   clientSecret: string | null;
@@ -32,18 +48,57 @@ export type ClientCredentialResponse = {
   updatedAt: string;
 };
 
+type ClientCredentialRow = typeof schema.clientCredentials.$inferSelect;
+
 const { clientCredentials } = schema;
 
-function toResponse(
-  row: typeof clientCredentials.$inferSelect,
+function maskSecret(value: string | null, headLength: number): string | null {
+  if (!value) return null;
+  if (value.length <= headLength + 4) return value;
+  return `${value.slice(0, headLength)}...${value.slice(-4)}`;
+}
+
+export function toMaskedResponse(
+  row: ClientCredentialRow,
 ): ClientCredentialResponse {
+  const accessToken = row.encryptedAccessToken
+    ? decrypt(row.encryptedAccessToken)
+    : null;
+  const refreshToken = row.encryptedRefreshToken
+    ? decrypt(row.encryptedRefreshToken)
+    : null;
   return {
     id: row.id,
     tenantId: row.tenantId,
     clientId: row.clientId,
     provider: row.provider,
     email: row.email,
-    accessToken: decrypt(row.encryptedAccessToken),
+    accessToken: maskSecret(accessToken, 6),
+    hasAccessToken: !!row.encryptedAccessToken,
+    refreshToken: !!row.encryptedRefreshToken,
+    hasRefreshToken: !!row.encryptedRefreshToken,
+    clientSecret: maskSecret(
+      row.encryptedClientSecret ? decrypt(row.encryptedClientSecret) : null,
+      4,
+    ),
+    metadata: row.metadata ? JSON.parse(row.metadata) : null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function toDecryptedValues(
+  row: ClientCredentialRow,
+): ClientCredentialDecryptedValues {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    clientId: row.clientId,
+    provider: row.provider,
+    email: row.email,
+    accessToken: row.encryptedAccessToken
+      ? decrypt(row.encryptedAccessToken)
+      : "",
     refreshToken: row.encryptedRefreshToken
       ? decrypt(row.encryptedRefreshToken)
       : null,
@@ -59,7 +114,7 @@ function toResponse(
 export async function listClientCredentials(
   tenantId: string,
   clientId: string,
-): Promise<ClientCredentialResponse[]> {
+): Promise<ClientCredentialRow[]> {
   const rows = await db
     .select()
     .from(clientCredentials)
@@ -69,13 +124,13 @@ export async function listClientCredentials(
         eq(clientCredentials.clientId, clientId),
       ),
     );
-  return rows.map(toResponse);
+  return rows;
 }
 
 export async function getClientCredential(
   id: string,
   tenantId: string,
-): Promise<ClientCredentialResponse | null> {
+): Promise<ClientCredentialRow | null> {
   const [row] = await db
     .select()
     .from(clientCredentials)
@@ -87,12 +142,12 @@ export async function getClientCredential(
     )
     .limit(1);
   if (!row) return null;
-  return toResponse(row);
+  return row;
 }
 
 export async function createClientCredential(
   input: ClientCredentialInput,
-): Promise<ClientCredentialResponse> {
+): Promise<ClientCredentialRow> {
   const tenantId = getActiveTenantId();
   const id = randomUUID();
   const now = new Date().toISOString();
@@ -123,7 +178,7 @@ export async function createClientCredential(
 export async function updateClientCredential(
   id: string,
   input: ClientCredentialUpdate,
-): Promise<ClientCredentialResponse | null> {
+): Promise<ClientCredentialRow | null> {
   const tenantId = getActiveTenantId();
   const existing = await getClientCredential(id, tenantId);
   if (!existing) return null;

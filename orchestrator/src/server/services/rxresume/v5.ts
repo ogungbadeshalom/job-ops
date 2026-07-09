@@ -119,7 +119,7 @@ async function executeWithKeyRetries(
         endpoint: pathFromUrl(url),
         method: options.method ?? "GET",
         status: response.status,
-        upstreamError: errorBody,
+        message: errorMsg,
       });
 
       throw new Error(

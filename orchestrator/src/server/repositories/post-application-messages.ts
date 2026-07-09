@@ -8,13 +8,14 @@ import type {
   PostApplicationRelevanceDecision,
   PostApplicationRouterStageTarget,
 } from "@shared/types";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, type SQL, sql } from "drizzle-orm";
 import { db, schema } from "../db";
 import {
   normalizeStageTarget,
   stageTargetFromMessageType,
 } from "../services/post-application/stage-target";
 import {
+  clientDataScopeFilter,
   getPrivateDataScope,
   privateDataScopeFilter,
 } from "../tenancy/private-scope";
@@ -26,7 +27,10 @@ const {
 } = schema;
 
 function messagesScopeFilter() {
-  return privateDataScopeFilter(postApplicationMessages);
+  return and(
+    privateDataScopeFilter(postApplicationMessages),
+    clientDataScopeFilter(postApplicationMessages),
+  ) as SQL;
 }
 
 function integrationsScopeFilter() {
@@ -37,10 +41,16 @@ async function resolveClientIdFromJob(
   matchedJobId: string | null | undefined,
 ): Promise<string | null> {
   if (!matchedJobId) return null;
+  const scope = getPrivateDataScope();
   const [row] = await db
     .select({ clientId: jobsTable.clientId })
     .from(jobsTable)
-    .where(eq(jobsTable.id, matchedJobId))
+    .where(
+      and(
+        eq(jobsTable.id, matchedJobId),
+        eq(jobsTable.tenantId, scope.tenantId),
+      ),
+    )
     .limit(1);
   return row?.clientId ?? null;
 }

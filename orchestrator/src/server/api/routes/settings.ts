@@ -9,7 +9,7 @@ import {
 } from "@infra/errors";
 import { asyncRoute, fail, ok } from "@infra/http";
 import { logger } from "@infra/logger";
-import { getRequestId, isSystemAdmin } from "@infra/request-context";
+import { getRequestId, getUserId, isSystemAdmin } from "@infra/request-context";
 import { isDemoMode, sendDemoBlocked } from "@server/config/demo";
 import { getSetting } from "@server/repositories/settings";
 import { enqueueAutoPdfRegenerationForSettingsChanges } from "@server/services/auto-pdf-regeneration";
@@ -35,6 +35,7 @@ import {
 } from "@server/services/rxresume";
 import { getEffectiveSettings } from "@server/services/settings";
 import { applySettingsUpdates } from "@server/services/settings-update";
+import { getActiveTenantId } from "@server/tenancy/context";
 import {
   mapGlmProviderAlias,
   settingsRegistry,
@@ -124,20 +125,30 @@ function getDefaultValidationBaseUrl(
   return undefined;
 }
 
-const CODEX_AUTH_VALIDATION_TTL_MS = 5_000;
-let codexValidationCache: {
-  value: { valid: boolean; message: string | null; username?: string | null };
-  expiresAtMs: number;
-} | null = null;
-let codexValidationInFlight: Promise<{
-  valid: boolean;
-  message: string | null;
-  username?: string | null;
-}> | null = null;
+const CODEX_AUTH_VALIDATION_TTL_MS = 5 * 60 * 1000;
+const codexValidationCache = new Map<
+  string,
+  {
+    value: { valid: boolean; message: string | null; username?: string | null };
+    expiresAtMs: number;
+  }
+>();
+const codexValidationInFlight = new Map<
+  string,
+  Promise<{
+    valid: boolean;
+    message: string | null;
+    username?: string | null;
+  }>
+>();
+
+function getCodexValidationCacheKey(): string {
+  return `${getActiveTenantId()}:${getUserId() ?? "anonymous"}`;
+}
 
 function clearCodexValidationCache(): void {
-  codexValidationCache = null;
-  codexValidationInFlight = null;
+  codexValidationCache.clear();
+  codexValidationInFlight.clear();
 }
 
 async function validateCodexCredentials(): Promise<{
@@ -153,28 +164,36 @@ async function getCachedCodexValidation(): Promise<{
   message: string | null;
   username?: string | null;
 }> {
+  const cacheKey = getCodexValidationCacheKey();
   const now = Date.now();
-  if (codexValidationCache && codexValidationCache.expiresAtMs > now) {
-    return codexValidationCache.value;
+  const cached = codexValidationCache.get(cacheKey);
+  if (cached && cached.expiresAtMs > now) {
+    return cached.value;
   }
 
-  if (codexValidationInFlight) {
-    return await codexValidationInFlight;
+  if (cached) {
+    codexValidationCache.delete(cacheKey);
   }
 
-  codexValidationInFlight = (async () => {
+  const inFlight = codexValidationInFlight.get(cacheKey);
+  if (inFlight) {
+    return await inFlight;
+  }
+
+  const validationPromise = (async () => {
     const validation = await validateCodexCredentials();
-    codexValidationCache = {
+    codexValidationCache.set(cacheKey, {
       value: validation,
       expiresAtMs: Date.now() + CODEX_AUTH_VALIDATION_TTL_MS,
-    };
+    });
     return validation;
   })();
+  codexValidationInFlight.set(cacheKey, validationPromise);
 
   try {
-    return await codexValidationInFlight;
+    return await validationPromise;
   } finally {
-    codexValidationInFlight = null;
+    codexValidationInFlight.delete(cacheKey);
   }
 }
 
@@ -383,6 +402,12 @@ settingsRouter.patch(
 settingsRouter.post(
   "/llm-models",
   asyncRoute(async (req: Request, res: Response) => {
+    if (!isSystemAdmin()) {
+      return fail(
+        res,
+        forbidden("Administrator access is required to list LLM models"),
+      );
+    }
     if (isDemoMode()) {
       ok(res, { models: [] });
       return;
@@ -437,6 +462,12 @@ settingsRouter.post(
 settingsRouter.get(
   "/codex-auth",
   asyncRoute(async (_req: Request, res: Response) => {
+    if (!isSystemAdmin()) {
+      return fail(
+        res,
+        forbidden("Administrator access is required to view Codex auth status"),
+      );
+    }
     const data = await getCodexAuthResponseData();
     ok(res, data);
   }),
@@ -445,6 +476,12 @@ settingsRouter.get(
 settingsRouter.post(
   "/codex-auth/start",
   asyncRoute(async (req: Request, res: Response) => {
+    if (!isSystemAdmin()) {
+      return fail(
+        res,
+        forbidden("Administrator access is required to start Codex sign-in"),
+      );
+    }
     if (isDemoMode()) {
       fail(
         res,
@@ -478,6 +515,12 @@ settingsRouter.post(
 settingsRouter.post(
   "/codex-auth/disconnect",
   asyncRoute(async (_req: Request, res: Response) => {
+    if (!isSystemAdmin()) {
+      return fail(
+        res,
+        forbidden("Administrator access is required to disconnect Codex"),
+      );
+    }
     if (isDemoMode()) {
       return sendDemoBlocked(
         res,
@@ -557,6 +600,14 @@ function failRxResume(res: Response, error: unknown): void {
 settingsRouter.get(
   "/rx-resumes",
   asyncRoute(async (_req: Request, res: Response) => {
+    if (!isSystemAdmin()) {
+      return fail(
+        res,
+        forbidden(
+          "Administrator access is required to list Reactive Resume resumes",
+        ),
+      );
+    }
     try {
       const resumes = await listResumes();
 
@@ -578,6 +629,14 @@ settingsRouter.get(
 settingsRouter.get(
   "/rx-resumes/:id/projects",
   asyncRoute(async (req: Request, res: Response) => {
+    if (!isSystemAdmin()) {
+      return fail(
+        res,
+        forbidden(
+          "Administrator access is required to view Reactive Resume projects",
+        ),
+      );
+    }
     try {
       const resumeId = req.params.id;
       if (!resumeId) {

@@ -5,12 +5,14 @@ import {
   createClientCredential,
   deleteClientCredential,
   listClientCredentials,
+  toMaskedResponse,
   updateClientCredential,
 } from "@server/repositories/client-credentials";
 import { getClientById } from "@server/repositories/clients";
+import { isWorkerAssignedToClient } from "@server/repositories/worker-assignments";
 import { isVaultEnabled } from "@server/services/credential-vault";
 import { getActiveTenantId } from "@server/tenancy/context";
-import { requireRole } from "@server/tenancy/private-scope";
+import { getActiveRole } from "@server/tenancy/private-scope";
 import type { Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
@@ -76,20 +78,30 @@ clientCredentialsRouter.get(
       return;
     }
 
-    if (!isSystemAdmin()) {
-      requireRole("worker");
+    const role = getActiveRole();
+    if (role !== "admin" && role !== "owner" && role !== "worker") {
+      fail(res, forbidden("Admin, owner, or worker access is required"));
+      return;
     }
 
     const scope = await getScopedClient(req.params.clientId, res);
     if (!scope) return;
 
-    const tenantId = getActiveTenantId();
-    const credentials = await listClientCredentials(
-      tenantId,
-      req.params.clientId,
-    );
+    if (role === "worker") {
+      const assigned = await isWorkerAssignedToClient(
+        userId,
+        req.params.clientId,
+      );
+      if (!assigned) {
+        fail(res, forbidden("You are not assigned to this client"));
+        return;
+      }
+    }
 
-    ok(res, { credentials });
+    const tenantId = getActiveTenantId();
+    const rows = await listClientCredentials(tenantId, req.params.clientId);
+
+    ok(res, { credentials: rows.map(toMaskedResponse) });
   }),
 );
 
@@ -108,7 +120,7 @@ clientCredentialsRouter.post(
     const scope = await getScopedClient(req.params.clientId, res);
     if (!scope) return;
 
-    const credential = await createClientCredential({
+    const row = await createClientCredential({
       clientId: req.params.clientId,
       provider: parsed.data.provider,
       email: parsed.data.email,
@@ -118,7 +130,7 @@ clientCredentialsRouter.post(
       metadata: parsed.data.metadata ?? null,
     });
 
-    ok(res, { credential }, 201);
+    ok(res, { credential: toMaskedResponse(row) }, 201);
   }),
 );
 
@@ -137,16 +149,16 @@ clientCredentialsRouter.patch(
     const scope = await getScopedClient(req.params.clientId, res);
     if (!scope) return;
 
-    const credential = await updateClientCredential(
+    const row = await updateClientCredential(
       req.params.credentialId,
       parsed.data,
     );
-    if (!credential) {
+    if (!row) {
       fail(res, notFound("Credential not found"));
       return;
     }
 
-    ok(res, { credential });
+    ok(res, { credential: toMaskedResponse(row) });
   }),
 );
 

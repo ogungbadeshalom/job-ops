@@ -83,6 +83,7 @@ function parseConfigSnapshot(
 export async function createPipelineRun(args?: {
   configSnapshot?: PipelineRunConfigSnapshot | null;
   savedDetails?: PipelineRunSavedDetails | null;
+  clientId?: string | null;
 }): Promise<PipelineRun> {
   const id = randomUUID();
   const now = new Date().toISOString();
@@ -92,6 +93,7 @@ export async function createPipelineRun(args?: {
     id,
     tenantId: scope.tenantId,
     userId: scope.userId,
+    clientId: args?.clientId ?? null,
     startedAt: now,
     status: "running",
     configSnapshot: serializeConfigSnapshot(args?.configSnapshot ?? null),

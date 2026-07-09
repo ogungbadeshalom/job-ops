@@ -22,6 +22,7 @@ import { getTenantDesignResumePdfPath } from "@server/services/pdf-storage";
 import { clearProfileCache } from "@server/services/profile";
 import { parseV5ResumeData } from "@server/services/rxresume/schema/v5";
 import { getJobOpsPublicAvailability } from "@server/services/tracer-links";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import type { DesignResumeJson, DesignResumePatchRequest } from "@shared/types";
 import { type Request, type Response, Router } from "express";
 import { z } from "zod";
@@ -277,6 +278,7 @@ designResumeRouter.get(
 designResumeRouter.post(
   "/import/rxresume",
   asyncRoute(async (_req: Request, res: Response) => {
+    requireNonClientRole();
     const document = await importDesignResumeFromReactiveResume();
     clearProfileCache();
     ok(res, document, 201);
@@ -289,6 +291,7 @@ designResumeRouter.post(
 designResumeRouter.post(
   "/import/file",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const startedAt = Date.now();
     const requestId = getRequestId();
     const input = importFileSchema.parse(req.body);
@@ -335,6 +338,7 @@ designResumeRouter.post(
 designResumeRouter.post(
   "/ai/field-suggestion",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const input = designResumeAiFieldSuggestionSchema.parse(req.body);
     const document = parseDesignResumeJson(input.document);
     ok(
@@ -351,6 +355,7 @@ designResumeRouter.post(
 designResumeRouter.patch(
   "/",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const input = designResumePatchSchema.parse(
       req.body,
     ) as DesignResumePatchRequest;
@@ -364,6 +369,7 @@ designResumeRouter.patch(
 designResumeRouter.post(
   "/assets",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     await assertPictureSupportEnabled(req);
 
     if (Buffer.isBuffer(req.body)) {
@@ -399,6 +405,7 @@ designResumeRouter.post(
 designResumeRouter.delete(
   "/assets/picture",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const input = pictureMutationSchema.parse(req.body ?? {});
     const document = await deleteDesignResumePicture({
       baseRevision: input.baseRevision,

@@ -8,7 +8,10 @@ import {
   listPostApplicationRunMessages,
   runPostApplicationInboxAction,
 } from "@server/services/post-application/review";
-import { requireNonClientRole } from "@server/tenancy/private-scope";
+import {
+  requireNonClientRole,
+  requireRole,
+} from "@server/tenancy/private-scope";
 import {
   APPLICATION_STAGES,
   POST_APPLICATION_PROVIDERS,
@@ -60,6 +63,7 @@ postApplicationReviewRouter.get(
   "/inbox",
   asyncRoute(async (req: Request, res: Response) => {
     try {
+      requireRole("admin", "owner");
       const query = listQuerySchema.parse(req.query);
       const items = await listPostApplicationInbox({
         provider: query.provider,
@@ -81,6 +85,7 @@ postApplicationReviewRouter.get(
   "/runs",
   asyncRoute(async (req: Request, res: Response) => {
     try {
+      requireRole("admin", "owner");
       const query = listQuerySchema.parse(req.query);
       const runs = await listPostApplicationReviewRuns({
         provider: query.provider,
@@ -102,6 +107,7 @@ postApplicationReviewRouter.get(
   "/runs/:runId/messages",
   asyncRoute(async (req: Request, res: Response) => {
     try {
+      requireRole("admin", "owner");
       const query = listQuerySchema.parse(req.query);
       const { runId } = runParamsSchema.parse(req.params);
       const result = await listPostApplicationRunMessages({

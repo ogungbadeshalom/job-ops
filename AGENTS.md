@@ -222,6 +222,9 @@ Removed from nav: Tracer Links, Visa Sponsors, Watchlist, Design Resume, Pipelin
 22. **Pipeline stuck at 5% (stale lock)** — if a pipeline run crashed or hung, `tenantState.isRunning` stayed `true` forever, blocking all future runs. Fixed: stale-lock recovery — if a run is "running" for >10 min, the next attempt force-clears the lock with a warning log.
 23. **OfflinePage "Try again" trapped on /offline** — button called `window.location.reload()` which reloaded `/offline`. Fixed: uses `navigate("/", { replace: true })` to leave the offline page.
 24. **Sign-in form not centered** — rendered inside the sidebar layout (`lg:ml-64` offset). Fixed: chromeless routes bypass the sidebar entirely via `isChromeless` flag in `App.tsx`.
+25. **OAuth credentials stored in plaintext** — `post_application_integrations.credentials` persisted refresh/access tokens as raw JSON. Fixed: added a structured warning log at write time and documented the known limitation pending full credential-vault encryption migration.
+26. **LLM API keys and OAuth tokens stored in plaintext** — `settings` table persists LLM API keys and OAuth tokens without encryption-at-rest. Fixed: documented as a known limitation requiring encryption-at-rest migration (deferred).
+27. **Backups are global** (single SQLite DB), not per-tenant — acceptable for self-hosted single-tenant; for multi-tenant hosted, needs per-tenant database or scoped backup.
 
 ## Priority Build Queue (Current)
 

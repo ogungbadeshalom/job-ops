@@ -69,7 +69,9 @@ export async function scoreJobsStep(args: {
       const { score, reason } = scoringInstructions
         ? await scoreJobSuitability(job, args.profile, { scoringInstructions })
         : await scoreJobSuitability(job, args.profile);
-      const jobBrief = await generateJobBrief(job.jobDescription, { jobId: job.id });
+      const jobBrief = await generateJobBrief(job.jobDescription, {
+        jobId: job.id,
+      });
       if (args.shouldCancel?.()) return;
 
       let sponsorMatchScore = 0;

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { badRequest, forbidden, notFound } from "@infra/errors";
 import { asyncRoute, fail, ok } from "@infra/http";
+import { logger } from "@infra/logger";
 import { getRole, getUserId } from "@infra/request-context";
 import { revokeAuthSessionsForUser } from "@server/repositories/auth-sessions";
 import {
@@ -206,12 +207,15 @@ clientsRouter.post(
     const username = `${emailPrefix.toLowerCase()}-${suffix}`;
     const password = randomBytes(16).toString("hex");
 
+    const tenantId = getActiveTenantId();
+
     const user = await createPrivateWorkspaceUser({
       username,
       password,
       displayName: client.name,
       isSystemAdmin: false,
-      useDefaultTenant: true,
+      useDefaultTenant: false,
+      tenantId,
       role: "client",
     });
 
@@ -222,6 +226,10 @@ clientsRouter.post(
 
     await setClientCreatedBy(req.params.id, user.id);
 
+    // The admin needs the generated password to share with the client.
+    // Mark the response so upstream proxies/loggers can avoid caching.
+    logger.info("Client login created", { clientId: req.params.id, username });
+    res.setHeader("X-Sensitive", "password");
     ok(res, { username, password }, 201);
   }),
 );

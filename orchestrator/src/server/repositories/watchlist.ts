@@ -87,8 +87,12 @@ export async function replaceWatchlistSelectedSources(
   const now = new Date().toISOString();
 
   db.transaction((tx) => {
+    const filters = [privateDataScopeFilter(watchlistSelectedSources)];
+    if (clientId) {
+      filters.push(eq(watchlistSelectedSources.clientId, clientId));
+    }
     tx.delete(watchlistSelectedSources)
-      .where(privateDataScopeFilter(watchlistSelectedSources))
+      .where(and(...filters))
       .run();
 
     if (input.selections.length === 0) {

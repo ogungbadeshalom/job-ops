@@ -7,11 +7,13 @@ import { getRoleFromToken, isAdminFromToken } from "@/client/lib/jwt";
 interface AuthGuardProps {
   children: React.ReactNode;
   requiredRole?: "admin" | "worker" | "client";
+  requireNonClientRole?: boolean;
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({
   children,
   requiredRole,
+  requireNonClientRole,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,26 +30,36 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
       return;
     }
 
-    if (!requiredRole) {
+    if (!requiredRole && !requireNonClientRole) {
       setChecking(false);
       return;
     }
 
-    if (requiredRole === "admin") {
-      if (!isAdminFromToken()) {
-        navigate("/", { replace: true });
-        return;
+    if (requiredRole) {
+      if (requiredRole === "admin") {
+        if (!isAdminFromToken()) {
+          navigate("/", { replace: true });
+          return;
+        }
+      } else {
+        const role = getRoleFromToken();
+        if (role !== requiredRole) {
+          navigate("/", { replace: true });
+          return;
+        }
       }
-    } else {
+    }
+
+    if (requireNonClientRole) {
       const role = getRoleFromToken();
-      if (role !== requiredRole) {
+      if (role === "client") {
         navigate("/", { replace: true });
         return;
       }
     }
 
     setChecking(false);
-  }, [isSignedIn, requiredRole, navigate, location]);
+  }, [isSignedIn, requiredRole, requireNonClientRole, navigate, location]);
 
   if (!isSignedIn) {
     return (

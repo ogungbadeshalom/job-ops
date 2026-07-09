@@ -1,9 +1,10 @@
+import { getActiveTenantId } from "@server/tenancy/context";
 import type { ResponseMode } from "../types";
 
 const modeCache = new Map<string, ResponseMode>();
 
 export function buildModeCacheKey(provider: string, baseUrl: string): string {
-  return `${provider}:${baseUrl}`;
+  return `${getActiveTenantId()}:${provider}:${baseUrl}`;
 }
 
 export function getOrderedModes(

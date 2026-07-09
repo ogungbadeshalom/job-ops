@@ -156,10 +156,10 @@ describe.sequential("client-credentials API", () => {
     const createBody = await createRes.json();
     expect(createBody.data.credential.provider).toBe("gmail");
     expect(createBody.data.credential.email).toBe("client@gmail.com");
-    expect(createBody.data.credential.accessToken).toBe("ya29.a0-secret-token");
-    expect(createBody.data.credential.refreshToken).toBe(
-      "1//refresh-token-value",
-    );
+    expect(createBody.data.credential.accessToken).toBe("ya29.a...oken");
+    expect(createBody.data.credential.hasAccessToken).toBe(true);
+    expect(createBody.data.credential.refreshToken).toBe(true);
+    expect(createBody.data.credential.hasRefreshToken).toBe(true);
     const credId = createBody.data.credential.id;
 
     const listRes = await fetch(
@@ -203,8 +203,10 @@ describe.sequential("client-credentials API", () => {
     expect(updateRes.status).toBe(200);
     const updateBody = await updateRes.json();
     expect(updateBody.data.credential.email).toBe("updated@example.com");
-    expect(updateBody.data.credential.accessToken).toBe("new-token");
-    expect(updateBody.data.credential.refreshToken).toBe("new-refresh");
+    expect(updateBody.data.credential.accessToken).toBe("new-to...oken");
+    expect(updateBody.data.credential.hasAccessToken).toBe(true);
+    expect(updateBody.data.credential.refreshToken).toBe(true);
+    expect(updateBody.data.credential.hasRefreshToken).toBe(true);
   });
 
   it("deletes credential", async () => {

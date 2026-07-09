@@ -39,7 +39,10 @@ export function OfflinePage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" onClick={() => navigate("/", { replace: true })}>
+          <Button
+            type="button"
+            onClick={() => navigate("/", { replace: true })}
+          >
             Try again
           </Button>
         </div>

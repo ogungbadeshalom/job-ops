@@ -7,6 +7,7 @@ import {
 } from "@infra/errors";
 import { logger } from "@infra/logger";
 import { getRequestId } from "@infra/request-context";
+import { getActiveTenantId } from "@server/tenancy/context";
 import {
   GHOSTWRITER_DOCUMENT_CONTEXT_MAX_SELECTED,
   normalizeGhostwriterSelectedDocumentIds,
@@ -216,6 +217,7 @@ function resolveOpenRouterModelsUrl(baseUrl: string | null): string {
 
 function buildOpenRouterCapabilityCacheKey(input: LlmRuntimeSettings): string {
   return [
+    getActiveTenantId(),
     "openrouter",
     input.baseUrl || "https://openrouter.ai",
     input.model.trim().toLowerCase(),

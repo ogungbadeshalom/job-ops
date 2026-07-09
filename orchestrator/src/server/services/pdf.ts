@@ -490,7 +490,18 @@ export async function pdfExists(jobId: string): Promise<boolean> {
  * Get the path to a job's PDF.
  */
 export function getPdfPath(jobId: string): string {
-  const pdfPath = getTenantJobPdfPath(jobId);
-  if (existsSync(pdfPath)) return pdfPath;
-  return getLegacyJobPdfPath(jobId);
+  const tenantPath = getTenantJobPdfPath(jobId);
+  if (existsSync(tenantPath)) return tenantPath;
+
+  const legacyPath = getLegacyJobPdfPath(jobId);
+  if (existsSync(legacyPath)) {
+    logger.warn("Falling back to legacy unscoped PDF path", {
+      jobId,
+      tenantPath,
+      legacyPath,
+    });
+    return legacyPath;
+  }
+
+  return tenantPath;
 }

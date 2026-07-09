@@ -10,9 +10,11 @@ import {
 } from "@infra/errors";
 import { fail, ok, okWithMeta } from "@infra/http";
 import { logger } from "@infra/logger";
+import { rateLimit } from "@infra/rate-limit";
 import {
-  getUserId,
   getRole,
+  getTenantId,
+  getUserId,
   isSystemAdmin,
   runWithRequestContext,
 } from "@infra/request-context";
@@ -51,6 +53,7 @@ import { simulatePipelineRun } from "@server/services/demo-simulator";
 import { reserveHostedUsage } from "@server/services/hosted-usage";
 import { planPipelineSearch } from "@server/services/pipeline-search-plan";
 import { ensurePipelineSearchTerms } from "@server/services/pipeline-search-terms";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { PIPELINE_EXTRACTOR_SOURCE_IDS } from "@shared/extractors";
 import {
   createLocationIntent,
@@ -120,6 +123,7 @@ function resolveRequestOrigin(req: Request): string | null {
  */
 pipelineRouter.get("/status", async (_req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const { isRunning } = getPipelineStatus();
     const lastRun = await pipelineRepo.getLatestPipelineRun();
     const data: PipelineStatusResponse = {
@@ -145,6 +149,7 @@ pipelineRouter.get("/status", async (_req: Request, res: Response) => {
  */
 pipelineRouter.get("/progress/snapshot", (_req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const data: PipelineProgressState = getProgress();
     ok(res, data);
   } catch (error) {
@@ -163,6 +168,7 @@ pipelineRouter.get("/progress/snapshot", (_req: Request, res: Response) => {
  * GET /api/pipeline/progress - Server-Sent Events endpoint for live progress
  */
 pipelineRouter.get("/progress", (req: Request, res: Response) => {
+  requireNonClientRole();
   setupSse(res, {
     cacheControl: "no-cache, no-transform",
     disableBuffering: true,
@@ -192,6 +198,7 @@ pipelineRouter.get("/progress", (req: Request, res: Response) => {
  */
 pipelineRouter.get("/runs", async (_req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const runs = await pipelineRepo.getRecentPipelineRuns(20);
     ok(res, runs);
   } catch (error) {
@@ -255,6 +262,7 @@ const pipelineSearchPlanSchema = z
 
 pipelineRouter.get("/search-presets", async (_req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     ok(res, {
       searches: await pipelineSearchPresetsRepo.listPipelineSearchPresets(),
     });
@@ -272,6 +280,7 @@ pipelineRouter.get("/search-presets", async (_req: Request, res: Response) => {
 
 pipelineRouter.post("/search-presets", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const input = createPipelineSearchPresetSchema.parse(req.body);
     if (
       await pipelineSearchPresetsRepo.pipelineSearchPresetNameExists({
@@ -308,6 +317,7 @@ pipelineRouter.patch(
   "/search-presets/:id",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       const input = updatePipelineSearchPresetSchema.parse(req.body);
       if (
         input.name !== undefined &&
@@ -349,6 +359,7 @@ pipelineRouter.post(
   "/search-presets/:id/used",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       const updated =
         await pipelineSearchPresetsRepo.markPipelineSearchPresetUsed(
           req.params.id,
@@ -372,6 +383,7 @@ pipelineRouter.delete(
   "/search-presets/:id",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       const deleted =
         await pipelineSearchPresetsRepo.deletePipelineSearchPreset(
           req.params.id,
@@ -393,6 +405,7 @@ pipelineRouter.delete(
 
 pipelineRouter.post("/search-plan", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const input = pipelineSearchPlanSchema.parse(req.body ?? {});
     ok(res, await planPipelineSearch(input));
   } catch (error) {
@@ -417,6 +430,7 @@ pipelineRouter.get(
   "/runs/:id/insights",
   async (req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       const insights = await pipelineRepo.getPipelineRunInsights(req.params.id);
       if (!insights) {
         return fail(res, notFound("Pipeline run not found"));
@@ -465,257 +479,270 @@ const runPipelineSchema = z.object({
   clientId: z.string().optional(),
 });
 
-pipelineRouter.post("/run", async (req: Request, res: Response) => {
-  try {
-    const config = runPipelineSchema.parse(req.body);
+const pipelineRunRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 3,
+  message:
+    "Too many pipeline runs. Please wait before starting another search.",
+  key: () => getTenantId() ?? "unknown",
+});
 
-    let resolvedSearchTerms = config.searchTerms;
-    let resolvedWorkplaceTypes = config.workplaceTypes;
-    let resolvedCityLocations = config.cityLocations;
+pipelineRouter.post(
+  "/run",
+  pipelineRunRateLimit,
+  async (req: Request, res: Response) => {
+    try {
+      requireNonClientRole();
+      const config = runPipelineSchema.parse(req.body);
 
-    // Auto-associate the run with a worker's single assigned client when no
-    // clientId was provided (e.g. main orchestrator "Run search"). With more
-    // than one assignment the worker must use a specific client dashboard.
-    if (!config.clientId && getRole() === "worker") {
-      const currentUserId = getUserId();
-      if (currentUserId) {
-        const assignedClientIds = await getAssignedClientIdsForWorker(
-          currentUserId,
+      let resolvedSearchTerms = config.searchTerms;
+      let resolvedWorkplaceTypes = config.workplaceTypes;
+      let resolvedCityLocations = config.cityLocations;
+
+      // Auto-associate the run with a worker's single assigned client when no
+      // clientId was provided (e.g. main orchestrator "Run search"). With more
+      // than one assignment the worker must use a specific client dashboard.
+      if (!config.clientId && getRole() === "worker") {
+        const currentUserId = getUserId();
+        if (currentUserId) {
+          const assignedClientIds =
+            await getAssignedClientIdsForWorker(currentUserId);
+          if (assignedClientIds.length === 1) {
+            config.clientId = assignedClientIds[0];
+            logger.info(
+              "Auto-associated pipeline run with single assigned client",
+              { clientId: config.clientId, workerId: currentUserId },
+            );
+          }
+        }
+      }
+
+      if (config.clientId) {
+        const client = await getClientById(config.clientId);
+        if (!client) {
+          return fail(res, notFound("Client not found"));
+        }
+
+        const currentUserId = getUserId();
+        if (currentUserId && !isSystemAdmin()) {
+          const assigned = await isWorkerAssignedToClient(
+            currentUserId,
+            config.clientId,
+          );
+          if (!assigned) {
+            return fail(res, forbidden("You are not assigned to this client"));
+          }
+        }
+
+        let clientSearchTerms: string[] = [];
+        let clientWorkplaceTypes: string[] = [];
+        let clientSearchCities: string[] = [];
+
+        try {
+          clientSearchTerms = JSON.parse(client.searchTerms) as string[];
+        } catch {
+          // ignore malformed JSON
+        }
+        try {
+          clientWorkplaceTypes = JSON.parse(client.workplaceTypes) as string[];
+        } catch {
+          // ignore malformed JSON
+        }
+        try {
+          clientSearchCities = JSON.parse(client.searchCities) as string[];
+        } catch {
+          // ignore malformed JSON
+        }
+
+        if (clientSearchTerms.length > 0) {
+          resolvedSearchTerms = clientSearchTerms;
+        }
+        if (clientWorkplaceTypes.length > 0) {
+          resolvedWorkplaceTypes = clientWorkplaceTypes as Array<
+            "remote" | "hybrid" | "onsite"
+          >;
+        }
+        if (clientSearchCities.length > 0) {
+          resolvedCityLocations = clientSearchCities;
+        }
+      }
+
+      const locationIntent = createLocationIntent({
+        selectedCountry: config.country,
+        cityLocations: resolvedCityLocations ?? config.cityLocations,
+        workplaceTypes: resolvedWorkplaceTypes ?? config.workplaceTypes,
+        geoScope: config.searchScope,
+        matchStrictness: config.matchStrictness,
+      });
+      if (config.sources && config.sources.length > 0) {
+        let registry: ExtractorRegistry;
+        try {
+          registry = await getExtractorRegistry();
+        } catch (error) {
+          logger.error(
+            "Extractor registry unavailable during source validation",
+            {
+              route: "/api/pipeline/run",
+              error,
+            },
+          );
+          return fail(
+            res,
+            serviceUnavailable(
+              "Extractor registry is unavailable. Try again after fixing startup errors.",
+            ),
+          );
+        }
+        const unavailableSources = config.sources.filter(
+          (source) => !registry.manifestBySource.has(source),
         );
-        if (assignedClientIds.length === 1) {
-          config.clientId = assignedClientIds[0];
-          logger.info(
-            "Auto-associated pipeline run with single assigned client",
-            { clientId: config.clientId, workerId: currentUserId },
+        if (unavailableSources.length > 0) {
+          return fail(
+            res,
+            badRequest(
+              `Requested sources are not available at runtime: ${unavailableSources.join(", ")}`,
+              { unavailableSources },
+            ),
+          );
+        }
+
+        const sourcePlans = planLocationSources({
+          intent: locationIntent,
+          sources: config.sources,
+          capabilitiesBySource: registry.locationCapabilitiesBySource ?? {},
+        });
+        if (sourcePlans.incompatibleSources.length > 0) {
+          const incompatible = sourcePlans.plans
+            .filter((plan) => !plan.isCompatible)
+            .map((plan) => ({
+              source: plan.source,
+              reasons: plan.reasons,
+            }));
+
+          return fail(
+            res,
+            badRequest(
+              "Requested sources are incompatible with the selected location setup",
+              { incompatibleSources: incompatible },
+            ),
           );
         }
       }
-    }
 
-    if (config.clientId) {
-      const client = await getClientById(config.clientId);
-      if (!client) {
-        return fail(res, notFound("Client not found"));
-      }
-
-      const currentUserId = getUserId();
-      if (currentUserId && !isSystemAdmin()) {
-        const assigned = await isWorkerAssignedToClient(
-          currentUserId,
-          config.clientId,
-        );
-        if (!assigned) {
-          return fail(res, forbidden("You are not assigned to this client"));
-        }
-      }
-
-      let clientSearchTerms: string[] = [];
-      let clientWorkplaceTypes: string[] = [];
-      let clientSearchCities: string[] = [];
-
-      try {
-        clientSearchTerms = JSON.parse(client.searchTerms) as string[];
-      } catch {
-        // ignore malformed JSON
-      }
-      try {
-        clientWorkplaceTypes = JSON.parse(client.workplaceTypes) as string[];
-      } catch {
-        // ignore malformed JSON
-      }
-      try {
-        clientSearchCities = JSON.parse(client.searchCities) as string[];
-      } catch {
-        // ignore malformed JSON
-      }
-
-      if (clientSearchTerms.length > 0) {
-        resolvedSearchTerms = clientSearchTerms;
-      }
-      if (clientWorkplaceTypes.length > 0) {
-        resolvedWorkplaceTypes = clientWorkplaceTypes as Array<
-          "remote" | "hybrid" | "onsite"
-        >;
-      }
-      if (clientSearchCities.length > 0) {
-        resolvedCityLocations = clientSearchCities;
-      }
-    }
-
-    const locationIntent = createLocationIntent({
-      selectedCountry: config.country,
-      cityLocations: resolvedCityLocations ?? config.cityLocations,
-      workplaceTypes: resolvedWorkplaceTypes ?? config.workplaceTypes,
-      geoScope: config.searchScope,
-      matchStrictness: config.matchStrictness,
-    });
-    if (config.sources && config.sources.length > 0) {
-      let registry: ExtractorRegistry;
-      try {
-        registry = await getExtractorRegistry();
-      } catch (error) {
-        logger.error(
-          "Extractor registry unavailable during source validation",
-          {
-            route: "/api/pipeline/run",
-            error,
-          },
-        );
-        return fail(
-          res,
-          serviceUnavailable(
-            "Extractor registry is unavailable. Try again after fixing startup errors.",
-          ),
-        );
-      }
-      const unavailableSources = config.sources.filter(
-        (source) => !registry.manifestBySource.has(source),
-      );
-      if (unavailableSources.length > 0) {
-        return fail(
-          res,
-          badRequest(
-            `Requested sources are not available at runtime: ${unavailableSources.join(", ")}`,
-            { unavailableSources },
-          ),
-        );
-      }
-
-      const sourcePlans = planLocationSources({
-        intent: locationIntent,
-        sources: config.sources,
-        capabilitiesBySource: registry.locationCapabilitiesBySource ?? {},
-      });
-      if (sourcePlans.incompatibleSources.length > 0) {
-        const incompatible = sourcePlans.plans
-          .filter((plan) => !plan.isCompatible)
-          .map((plan) => ({
-            source: plan.source,
-            reasons: plan.reasons,
-          }));
-
-        return fail(
-          res,
-          badRequest(
-            "Requested sources are incompatible with the selected location setup",
-            { incompatibleSources: incompatible },
-          ),
-        );
-      }
-    }
-
-    if (isDemoMode()) {
-      const simulated = await simulatePipelineRun({
-        topN: config.topN,
-        minSuitabilityScore: config.minSuitabilityScore,
-        sources: config.sources,
-        scoringInstructions: config.scoringInstructions,
-        locationIntent,
-      });
-      return okWithMeta(res, simulated, { simulated: true });
-    }
-
-    if (getPipelineStatus().isRunning) {
-      return fail(res, conflict("Pipeline is already running"));
-    }
-
-    const searchTermsState = await ensurePipelineSearchTerms({
-      requestedSearchTerms: resolvedSearchTerms ?? config.searchTerms,
-    });
-
-    if (
-      searchTermsState.searchTermsCount === null ||
-      searchTermsState.searchTermsCount === 0
-    ) {
-      return fail(
-        res,
-        badRequest(
-          "No search terms available. Configure search terms in the client profile or tenant settings before running the pipeline.",
-        ),
-      );
-    }
-
-    const pipelineUsage = await reserveHostedUsage({
-      action: "pipeline_run",
-    });
-
-    // Start pipeline in background
-    runWithRequestContext({}, () => {
-      runPipeline(
-        {
+      if (isDemoMode()) {
+        const simulated = await simulatePipelineRun({
           topN: config.topN,
           minSuitabilityScore: config.minSuitabilityScore,
           sources: config.sources,
           scoringInstructions: config.scoringInstructions,
           locationIntent,
-          watchlistSelectedSourceIds: config.watchlistSelectedSourceIds,
-          clientId: config.clientId ?? undefined,
+        });
+        return okWithMeta(res, simulated, { simulated: true });
+      }
+
+      if (getPipelineStatus().isRunning) {
+        return fail(res, conflict("Pipeline is already running"));
+      }
+
+      const searchTermsState = await ensurePipelineSearchTerms({
+        requestedSearchTerms: resolvedSearchTerms ?? config.searchTerms,
+      });
+
+      if (
+        searchTermsState.searchTermsCount === null ||
+        searchTermsState.searchTermsCount === 0
+      ) {
+        return fail(
+          res,
+          badRequest(
+            "No search terms available. Configure search terms in the client profile or tenant settings before running the pipeline.",
+          ),
+        );
+      }
+
+      const pipelineUsage = await reserveHostedUsage({
+        action: "pipeline_run",
+      });
+
+      // Start pipeline in background
+      runWithRequestContext({}, () => {
+        runPipeline(
+          {
+            topN: config.topN,
+            minSuitabilityScore: config.minSuitabilityScore,
+            sources: config.sources,
+            scoringInstructions: config.scoringInstructions,
+            locationIntent,
+            watchlistSelectedSourceIds: config.watchlistSelectedSourceIds,
+            clientId: config.clientId ?? undefined,
+          },
+          {
+            hostedUsageReservationId: pipelineUsage.reservation?.id ?? null,
+          },
+        ).catch((error) => {
+          const message =
+            error instanceof Error ? error.message : "Unknown error";
+          logger.error("Background pipeline run failed", error);
+          progressHelpers.failed(message);
+        });
+      });
+      void trackCanonicalActivationEvent(
+        "jobs_pipeline_run_started",
+        {
+          source_count: config.sources?.length,
+          selected_sources: toSelectedSourcesValue(config.sources),
+          top_n: config.topN,
+          min_suitability_score: config.minSuitabilityScore,
+          country: config.country,
+          has_city_locations: Array.isArray(
+            resolvedCityLocations ?? config.cityLocations,
+          )
+            ? (resolvedCityLocations ?? config.cityLocations ?? []).length > 0
+            : false,
+          search_terms_count: searchTermsState.searchTermsCount,
+          search_terms_source: searchTermsState.source,
+          // Count-only, never raw IDs (tenant safety / PII).
+          watchlist_source_filter_count: Array.isArray(
+            config.watchlistSelectedSourceIds,
+          )
+            ? config.watchlistSelectedSourceIds.length
+            : undefined,
+          client_id_provided: Boolean(config.clientId),
         },
         {
-          hostedUsageReservationId: pipelineUsage.reservation?.id ?? null,
+          requestOrigin: resolveRequestOrigin(req),
+          urlPath: "/jobs",
         },
-      ).catch((error) => {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        logger.error("Background pipeline run failed", error);
-        progressHelpers.failed(message);
-      });
-    });
-    void trackCanonicalActivationEvent(
-      "jobs_pipeline_run_started",
-      {
-        source_count: config.sources?.length,
-        selected_sources: toSelectedSourcesValue(config.sources),
-        top_n: config.topN,
-        min_suitability_score: config.minSuitabilityScore,
-        country: config.country,
-        has_city_locations: Array.isArray(
-          resolvedCityLocations ?? config.cityLocations,
-        )
-          ? (resolvedCityLocations ?? config.cityLocations ?? []).length > 0
-          : false,
-        search_terms_count: searchTermsState.searchTermsCount,
-        search_terms_source: searchTermsState.source,
-        // Count-only, never raw IDs (tenant safety / PII).
-        watchlist_source_filter_count: Array.isArray(
-          config.watchlistSelectedSourceIds,
-        )
-          ? config.watchlistSelectedSourceIds.length
-          : undefined,
-        client_id_provided: Boolean(config.clientId),
-      },
-      {
-        requestOrigin: resolveRequestOrigin(req),
-        urlPath: "/jobs",
-      },
-    );
-    ok(res, { message: "Search started" });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return fail(res, badRequest(error.message, error.flatten()));
+      );
+      ok(res, { message: "Search started" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return fail(res, badRequest(error.message, error.flatten()));
+      }
+      if (error instanceof Error && error.name === "AbortError") {
+        return fail(res, requestTimeout("Request timed out"));
+      }
+      if (error instanceof AppError) {
+        return fail(res, error);
+      }
+      fail(
+        res,
+        new AppError({
+          status: 500,
+          code: "INTERNAL_ERROR",
+          message: error instanceof Error ? error.message : "Unknown error",
+        }),
+      );
     }
-    if (error instanceof Error && error.name === "AbortError") {
-      return fail(res, requestTimeout("Request timed out"));
-    }
-    if (error instanceof AppError) {
-      return fail(res, error);
-    }
-    fail(
-      res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
-    );
-  }
-});
+  },
+);
 
 /**
  * POST /api/pipeline/cancel - Request cancellation of active pipeline run
  */
 pipelineRouter.post("/cancel", async (_req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const cancelResult = requestPipelineCancel();
     if (!cancelResult.accepted) {
       return fail(res, conflict("No running pipeline to cancel"));
@@ -754,6 +781,7 @@ pipelineRouter.post("/cancel", async (_req: Request, res: Response) => {
  */
 pipelineRouter.post("/resume-scoring", async (_req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const { resolved } = resumePipelineScoring();
     if (!resolved) {
       return fail(
@@ -780,6 +808,7 @@ pipelineRouter.post("/resume-scoring", async (_req: Request, res: Response) => {
  * Non-empty only when the pipeline is paused at the "challenge_required" step.
  */
 pipelineRouter.get("/challenges", (_req: Request, res: Response) => {
+  requireNonClientRole();
   ok(res, { challenges: getPendingChallenges() });
 });
 
@@ -792,6 +821,7 @@ pipelineRouter.post(
   "/challenge-viewer",
   async (_req: Request, res: Response) => {
     try {
+      requireNonClientRole();
       const status = await ensureChallengeViewer();
       const session = status.available ? createChallengeViewerSession() : null;
       ok(res, {
@@ -830,6 +860,7 @@ const solveChallengeSchema = z.object({
 
 pipelineRouter.post("/solve-challenge", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const body = solveChallengeSchema.parse(req.body);
 
     const pending = getPendingChallenges();

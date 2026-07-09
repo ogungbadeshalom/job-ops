@@ -1,4 +1,4 @@
-import { unauthorized } from "@infra/errors";
+import { forbidden, unauthorized } from "@infra/errors";
 import {
   getRequestContext,
   getRole,
@@ -57,7 +57,7 @@ export function getActiveRole(): string {
 export function requireRole(...allowedRoles: string[]): string {
   const role = getActiveRole();
   if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-    throw unauthorized(`Role "${role}" is not permitted for this operation`);
+    throw forbidden(`Role "${role}" is not permitted for this operation`);
   }
   return role;
 }

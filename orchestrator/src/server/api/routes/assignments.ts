@@ -1,5 +1,6 @@
 import { badRequest, conflict, notFound } from "@infra/errors";
 import { asyncRoute, fail, ok } from "@infra/http";
+import { logger } from "@infra/logger";
 import { getClientById } from "@server/repositories/clients";
 import { getUserById } from "@server/repositories/users";
 import {
@@ -10,6 +11,7 @@ import {
   listAssignmentsForWorker,
   updateAssignmentStatus,
 } from "@server/repositories/worker-assignments";
+import { getActiveTenantId } from "@server/tenancy/context";
 import { requireRole } from "@server/tenancy/private-scope";
 import type { Request, Response } from "express";
 import { Router } from "express";
@@ -61,11 +63,34 @@ assignmentsRouter.post(
       getClientById(parsed.data.clientId),
     ]);
     if (!worker) {
+      logger.warn("Assignment worker lookup returned null", {
+        workerId: parsed.data.workerId,
+        clientId: parsed.data.clientId,
+        tenantId: getActiveTenantId(),
+      });
       fail(res, notFound("Worker not found"));
       return;
     }
     if (!client) {
+      logger.warn("Assignment client lookup returned null", {
+        workerId: parsed.data.workerId,
+        clientId: parsed.data.clientId,
+        tenantId: getActiveTenantId(),
+      });
       fail(res, notFound("Client not found"));
+      return;
+    }
+
+    const tenantId = getActiveTenantId();
+    if (worker.workspaceId !== tenantId || client.tenantId !== tenantId) {
+      logger.warn("Assignment attempted across tenant boundary", {
+        workerId: worker.id,
+        clientId: client.id,
+        workerTenantId: worker.workspaceId,
+        clientTenantId: client.tenantId,
+        tenantId,
+      });
+      fail(res, notFound("Worker or client not found in this workspace"));
       return;
     }
 

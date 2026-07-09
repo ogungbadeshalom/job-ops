@@ -4,6 +4,7 @@
 
 import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { logger } from "@infra/logger";
 import Database from "better-sqlite3";
 import { getDataDir } from "../config/dataDir";
 
@@ -23,9 +24,10 @@ export function clearDatabase(): { jobsDeleted: number; runsDeleted: number } {
     const jobsResult = sqlite.prepare("DELETE FROM jobs").run();
     const runsResult = sqlite.prepare("DELETE FROM pipeline_runs").run();
 
-    console.log(
-      `🗑️ Cleared database: ${jobsResult.changes} jobs, ${runsResult.changes} pipeline runs`,
-    );
+    logger.info("Cleared database", {
+      jobsDeleted: jobsResult.changes,
+      runsDeleted: runsResult.changes,
+    });
     return {
       jobsDeleted: jobsResult.changes,
       runsDeleted: runsResult.changes,
@@ -41,9 +43,9 @@ export function clearDatabase(): { jobsDeleted: number; runsDeleted: number } {
 export function dropDatabase(): void {
   if (existsSync(DB_PATH)) {
     unlinkSync(DB_PATH);
-    console.log("🗑️ Database file deleted");
+    logger.info("Database file deleted");
   } else {
-    console.log("ℹ️ No database file to delete");
+    logger.info("No database file to delete");
   }
 }
 

@@ -1,3 +1,4 @@
+/** @deprecated Pipeline Board removed — redirects to /jobs/ready. Kept for test compatibility. */
 import {
   type LogEventFormValues,
   LogEventModal,

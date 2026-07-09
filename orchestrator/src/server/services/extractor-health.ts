@@ -1,5 +1,6 @@
 import { logger } from "@infra/logger";
 import { getExtractorRegistry } from "@server/extractors/registry";
+import { getActiveTenantId } from "@server/tenancy/context";
 import type { ExtractorSourceId } from "@shared/extractors";
 import type {
   ExtractorHealthResponse,
@@ -148,10 +149,14 @@ const HEALTH_PROBE_CONFIG_BY_SOURCE: Record<
   },
 };
 
-const extractorHealthCache = new Map<
-  ExtractorSourceId,
-  CachedHealthCheckEntry
->();
+const extractorHealthCache = new Map<string, CachedHealthCheckEntry>();
+
+function buildExtractorHealthCacheKey(
+  source: ExtractorSourceId,
+  tenantId = getActiveTenantId(),
+): string {
+  return `${tenantId}:${source}`;
+}
 
 function hasNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -175,10 +180,11 @@ function getCachedHealthCheck(
   source: ExtractorSourceId,
   now: number,
 ): ExtractorHealthCheckResult | null {
-  const cached = extractorHealthCache.get(source);
+  const cacheKey = buildExtractorHealthCacheKey(source);
+  const cached = extractorHealthCache.get(cacheKey);
   if (!cached) return null;
   if (cached.expiresAtMs <= now) {
-    extractorHealthCache.delete(source);
+    extractorHealthCache.delete(cacheKey);
     return null;
   }
   return cloneCachedResult(cached, now);
@@ -189,7 +195,8 @@ function cacheHealthCheck(
   checkedAtMs: number,
   result: ExtractorHealthCheckResult,
 ): void {
-  extractorHealthCache.set(source, {
+  const cacheKey = buildExtractorHealthCacheKey(source);
+  extractorHealthCache.set(cacheKey, {
     checkedAtMs,
     expiresAtMs: checkedAtMs + HEALTH_CACHE_TTL_MS,
     result,

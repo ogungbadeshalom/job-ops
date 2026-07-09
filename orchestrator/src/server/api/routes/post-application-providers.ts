@@ -5,7 +5,7 @@ import { logger } from "@infra/logger";
 import { executePostApplicationProviderAction } from "@server/services/post-application/providers";
 import {
   getPrivateDataScope,
-  requireNonClientRole,
+  requireRole,
 } from "@server/tenancy/private-scope";
 import {
   POST_APPLICATION_PROVIDER_ACTIONS,
@@ -236,6 +236,7 @@ postApplicationProvidersRouter.get(
   "/providers/gmail/oauth/start",
   asyncRoute(async (req: Request, res: Response) => {
     try {
+      requireRole("admin", "owner");
       cleanupOauthState();
       const parsed = oauthStartQuerySchema.parse(req.query);
       const accountKey = parsed.accountKey ?? "default";
@@ -281,7 +282,7 @@ postApplicationProvidersRouter.post(
   "/providers/gmail/oauth/exchange",
   asyncRoute(async (req: Request, res: Response) => {
     try {
-      requireNonClientRole();
+      requireRole("admin", "owner");
       cleanupOauthState();
       const body = oauthExchangeBodySchema.parse(req.body ?? {});
       const accountKey = body.accountKey ?? "default";
@@ -347,7 +348,7 @@ postApplicationProvidersRouter.post(
 postApplicationProvidersRouter.post(
   "/providers/:provider/actions/:action",
   asyncRoute(async (req: Request, res: Response) => {
-    requireNonClientRole();
+    requireRole("admin", "owner");
     let provider: (typeof POST_APPLICATION_PROVIDERS)[number];
     let action: (typeof POST_APPLICATION_PROVIDER_ACTIONS)[number];
 

@@ -19,7 +19,9 @@ import type {
   PipelineConfig,
   PipelineRunSavedDetails,
 } from "@shared/types";
+import { and, eq, lt } from "drizzle-orm";
 import { getDataDir } from "../config/dataDir";
+import { db, schema } from "../db";
 import * as jobsRepo from "../repositories/jobs";
 import * as pipelineRepo from "../repositories/pipeline";
 import * as settingsRepo from "../repositories/settings";
@@ -82,6 +84,21 @@ const DEFAULT_CONFIG: PipelineConfig = {
   enableImporting: true,
   enableAutoTailoring: true,
 };
+
+const MAX_PIPELINE_DURATION_MS = 30 * 60 * 1000;
+
+class PipelineTimeoutError extends Error {
+  constructor() {
+    super("Pipeline exceeded maximum duration of 30 minutes");
+    this.name = "PipelineTimeoutError";
+  }
+}
+
+function ensureWithinDuration(startedAt: number): void {
+  if (Date.now() - startedAt > MAX_PIPELINE_DURATION_MS) {
+    throw new PipelineTimeoutError();
+  }
+}
 
 function parseProjectIdsCsv(value: string | null | undefined): string[] {
   if (!value) return [];
@@ -169,6 +186,48 @@ async function resolveLocationIntent(
     searchScope: settings.locationSearchScope,
     matchStrictness: settings.locationMatchStrictness,
   });
+}
+
+const STALE_LOCK_MS = 10 * 60 * 1000;
+
+export async function recoverStalePipelineRuns(): Promise<void> {
+  const { pipelineRuns } = schema;
+  const cutoff = new Date(Date.now() - STALE_LOCK_MS).toISOString();
+  const staleRows = await db
+    .select({
+      id: pipelineRuns.id,
+      tenantId: pipelineRuns.tenantId,
+      startedAt: pipelineRuns.startedAt,
+    })
+    .from(pipelineRuns)
+    .where(
+      and(
+        eq(pipelineRuns.status, "running"),
+        lt(pipelineRuns.startedAt, cutoff),
+      ),
+    );
+
+  if (staleRows.length === 0) return;
+
+  logger.warn("Recovering stale pipeline runs", {
+    count: staleRows.length,
+    runIds: staleRows.map((row) => row.id),
+  });
+
+  const now = new Date().toISOString();
+  await db
+    .update(pipelineRuns)
+    .set({
+      status: "failed",
+      completedAt: now,
+      errorMessage: "Recovered from stale lock on server startup",
+    })
+    .where(
+      and(
+        eq(pipelineRuns.status, "running"),
+        lt(pipelineRuns.startedAt, cutoff),
+      ),
+    );
 }
 
 // ---------- Challenge pause/resume state ----------
@@ -279,7 +338,6 @@ export async function runPipeline(
   // Stale-lock recovery: if a previous run has been "running" for more than
   // 10 minutes, it almost certainly crashed without cleaning up. Force-clear
   // the lock so the user isn't permanently blocked.
-  const STALE_LOCK_MS = 10 * 60 * 1000;
   if (
     tenantState.isRunning &&
     tenantState.startedAt != null &&
@@ -314,6 +372,7 @@ export async function runPipeline(
   tenantState.startedAt = Date.now();
   tenantState.activePipelineRunId = "pending";
   tenantState.cancelRequestedAt = null;
+  const pipelineStartTimestamp = tenantState.startedAt;
   resetProgress();
   const locationIntent = await resolveLocationIntent(config);
 
@@ -365,6 +424,7 @@ export async function runPipeline(
   const pipelineRun = await pipelineRepo.createPipelineRun({
     configSnapshot,
     savedDetails,
+    clientId: config.clientId ?? null,
   });
   tenantState.activePipelineRunId = pipelineRun.id;
 
@@ -402,8 +462,10 @@ export async function runPipeline(
         await discoverJobsStep({
           mergedConfig,
           watchlistSelectedSourceIds: mergedConfig.watchlistSelectedSourceIds,
-          shouldCancel: () =>
-            getPipelineState(scopeKey).cancelRequestedAt !== null,
+          shouldCancel: () => {
+            ensureWithinDuration(pipelineStartTimestamp);
+            return getPipelineState(scopeKey).cancelRequestedAt !== null;
+          },
         });
       await persistResultSummary({
         stage: "discovery",
@@ -439,6 +501,7 @@ export async function runPipeline(
         tenantState.activeChallengeState = null;
 
         ensureNotCancelled(scopeKey);
+        ensureWithinDuration(pipelineStartTimestamp);
 
         // Re-run only the extractors that had challenges
         pipelineLogger.info("Challenges resolved, re-running extractors", {
@@ -449,8 +512,10 @@ export async function runPipeline(
         const retryResult = await discoverJobsStep({
           mergedConfig: retryConfig,
           includeWatchlist: false,
-          shouldCancel: () =>
-            getPipelineState(scopeKey).cancelRequestedAt !== null,
+          shouldCancel: () => {
+            ensureWithinDuration(pipelineStartTimestamp);
+            return getPipelineState(scopeKey).cancelRequestedAt !== null;
+          },
         });
 
         discoveredJobs = [...discoveredJobs, ...retryResult.discoveredJobs];
@@ -502,8 +567,10 @@ export async function runPipeline(
         ({ unprocessedJobs, scoredJobs } = await scoreJobsStep({
           profile,
           scoringInstructions: mergedConfig.scoringInstructions,
-          shouldCancel: () =>
-            getPipelineState(scopeKey).cancelRequestedAt !== null,
+          shouldCancel: () => {
+            ensureWithinDuration(pipelineStartTimestamp);
+            return getPipelineState(scopeKey).cancelRequestedAt !== null;
+          },
         }));
       } catch (error) {
         if (error instanceof LlmNotConfiguredError) {
@@ -517,14 +584,17 @@ export async function runPipeline(
           tenantState.activeLlmConfigState = null;
 
           ensureNotCancelled(scopeKey);
+          ensureWithinDuration(pipelineStartTimestamp);
 
           pipelineLogger.info("LLM configured, resuming scoring");
 
           ({ unprocessedJobs, scoredJobs } = await scoreJobsStep({
             profile,
             scoringInstructions: mergedConfig.scoringInstructions,
-            shouldCancel: () =>
-              getPipelineState(scopeKey).cancelRequestedAt !== null,
+            shouldCancel: () => {
+              ensureWithinDuration(pipelineStartTimestamp);
+              return getPipelineState(scopeKey).cancelRequestedAt !== null;
+            },
           }));
         } else {
           throw error;
@@ -559,8 +629,10 @@ export async function runPipeline(
       const { processedCount } = await processJobsStep({
         jobsToProcess,
         processJob,
-        shouldCancel: () =>
-          getPipelineState(scopeKey).cancelRequestedAt !== null,
+        shouldCancel: () => {
+          ensureWithinDuration(pipelineStartTimestamp);
+          return getPipelineState(scopeKey).cancelRequestedAt !== null;
+        },
       });
       jobsProcessed = processedCount;
 

@@ -3,6 +3,7 @@ import { runWithRequestContext } from "@infra/request-context";
 import { setupSse, writeSseData } from "@infra/sse";
 import { badRequest, toAppError } from "@server/infra/errors";
 import * as ghostwriterService from "@server/services/ghostwriter";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { type Request, Router } from "express";
 import { z } from "zod";
 
@@ -98,6 +99,7 @@ function getJobId(req: Request): string {
 ghostwriterRouter.get(
   "/messages",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const parsed = listMessagesQuerySchema.safeParse(req.query);
     if (!parsed.success) {
@@ -127,6 +129,7 @@ ghostwriterRouter.get(
 ghostwriterRouter.patch(
   "/context",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const parsed = updateContextSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -151,6 +154,7 @@ ghostwriterRouter.patch(
 ghostwriterRouter.post(
   "/messages",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
 
     const parsed = sendMessageSchema.safeParse(req.body);
@@ -250,6 +254,7 @@ ghostwriterRouter.post(
 ghostwriterRouter.post(
   "/runs/:runId/cancel",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const runId = req.params.runId;
     if (!runId) {
@@ -270,6 +275,7 @@ ghostwriterRouter.post(
 ghostwriterRouter.post(
   "/messages/:assistantMessageId/regenerate",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const assistantMessageId = req.params.assistantMessageId;
     if (!assistantMessageId) {
@@ -367,6 +373,7 @@ ghostwriterRouter.post(
 ghostwriterRouter.post(
   "/messages/:messageId/edit",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const messageId = req.params.messageId;
     if (!messageId) {
@@ -472,6 +479,7 @@ ghostwriterRouter.post(
 ghostwriterRouter.post(
   "/messages/:messageId/switch-branch",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const messageId = req.params.messageId;
     if (!messageId) {
@@ -492,6 +500,7 @@ ghostwriterRouter.post(
 ghostwriterRouter.post(
   "/reset",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
 
     await runWithRequestContext({ jobId }, async () => {
@@ -507,6 +516,7 @@ ghostwriterRouter.post(
 ghostwriterRouter.get(
   "/threads",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
 
     await runWithRequestContext({ jobId }, async () => {
@@ -519,6 +529,7 @@ ghostwriterRouter.get(
 ghostwriterRouter.post(
   "/threads",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const parsed = createThreadSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -541,6 +552,7 @@ ghostwriterRouter.post(
 ghostwriterRouter.get(
   "/threads/:threadId/messages",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const threadId = req.params.threadId;
     if (!threadId) {
@@ -570,6 +582,7 @@ ghostwriterRouter.get(
 ghostwriterRouter.post(
   "/threads/:threadId/messages",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const threadId = req.params.threadId;
     if (!threadId) {
@@ -675,6 +688,7 @@ ghostwriterRouter.post(
 ghostwriterRouter.post(
   "/threads/:threadId/runs/:runId/cancel",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const threadId = req.params.threadId;
     const runId = req.params.runId;
@@ -698,6 +712,7 @@ ghostwriterRouter.post(
 ghostwriterRouter.post(
   "/threads/:threadId/messages/:assistantMessageId/regenerate",
   asyncRoute(async (req, res) => {
+    requireNonClientRole();
     const jobId = getJobId(req);
     const threadId = req.params.threadId;
     const assistantMessageId = req.params.assistantMessageId;

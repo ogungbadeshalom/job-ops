@@ -1,4 +1,6 @@
-import { asyncRoute, ok, okWithMeta } from "@infra/http";
+import { forbidden } from "@infra/errors";
+import { asyncRoute, fail, ok, okWithMeta } from "@infra/http";
+import { isSystemAdmin } from "@infra/request-context";
 import { isDemoMode } from "@server/config/demo";
 import { suggestOnboardingSearchTerms } from "@server/services/onboarding-search-terms";
 import {
@@ -11,6 +13,12 @@ import {
 } from "@server/services/onboarding-status";
 import { type Request, type Response, Router } from "express";
 import { z } from "zod";
+
+function requireAdmin(res: Response): boolean {
+  if (isSystemAdmin()) return true;
+  fail(res, forbidden("Administrator access is required"));
+  return false;
+}
 
 export const onboardingRouter = Router();
 
@@ -38,6 +46,7 @@ onboardingRouter.get(
 onboardingRouter.post(
   "/actions/model",
   asyncRoute(async (req: Request, res: Response) => {
+    if (!requireAdmin(res)) return;
     if (isDemoMode()) {
       return okWithMeta(res, await getOnboardingStatus(), { simulated: true });
     }
@@ -51,6 +60,7 @@ onboardingRouter.post(
 onboardingRouter.post(
   "/actions/rxresume",
   asyncRoute(async (req: Request, res: Response) => {
+    if (!requireAdmin(res)) return;
     if (isDemoMode()) {
       return okWithMeta(res, await getOnboardingStatus(), { simulated: true });
     }
@@ -70,6 +80,7 @@ onboardingRouter.post(
 onboardingRouter.post(
   "/validate/openrouter",
   async (req: Request, res: Response) => {
+    if (!requireAdmin(res)) return;
     if (isDemoMode()) {
       return okWithMeta(
         res,
@@ -90,6 +101,7 @@ onboardingRouter.post(
 );
 
 onboardingRouter.post("/validate/llm", async (req: Request, res: Response) => {
+  if (!requireAdmin(res)) return;
   if (isDemoMode()) {
     return okWithMeta(
       res,
@@ -114,6 +126,7 @@ onboardingRouter.post("/validate/llm", async (req: Request, res: Response) => {
 onboardingRouter.post(
   "/validate/rxresume",
   async (req: Request, res: Response) => {
+    if (!requireAdmin(res)) return;
     if (isDemoMode()) {
       return okWithMeta(
         res,
@@ -140,6 +153,7 @@ onboardingRouter.post(
 onboardingRouter.get(
   "/validate/resume",
   async (_req: Request, res: Response) => {
+    if (!requireAdmin(res)) return;
     if (isDemoMode()) {
       return okWithMeta(
         res,
@@ -159,6 +173,7 @@ onboardingRouter.get(
 onboardingRouter.post(
   "/search-terms/suggest",
   asyncRoute(async (_req: Request, res: Response) => {
+    if (!requireAdmin(res)) return;
     if (isDemoMode()) {
       return okWithMeta(
         res,

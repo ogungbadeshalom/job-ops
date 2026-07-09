@@ -42,9 +42,18 @@ export async function notifyJobCompleteWebhook(job: Job) {
     });
 
     if (!response.ok) {
+      const sanitizedMessage = await response
+        .text()
+        .catch(() => "")
+        .then((text) =>
+          text
+            .replace(/[\r\n]+/g, " ")
+            .trim()
+            .slice(0, 100),
+        );
       logger.warn("Job complete webhook POST failed", {
         status: response.status,
-        response: (await response.text().catch(() => "")).slice(0, 200),
+        message: sanitizedMessage || "Upstream request failed",
         jobId: job.id,
       });
     }

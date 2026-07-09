@@ -2,7 +2,7 @@
  * Main App component.
  */
 
-import { X, Menu } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Navigate,
@@ -171,17 +171,42 @@ export const App: React.FC = () => {
         />
         <Route path="/job/:id" element={<JobPage />} />
         <Route path="/job/:id/:view" element={<JobPage />} />
-        <Route path="/design-resume" element={<DesignResumePage />} />
+        <Route
+          path="/design-resume"
+          element={
+            <AuthGuard requireNonClientRole>
+              <DesignResumePage />
+            </AuthGuard>
+          }
+        />
         <Route
           path="/design-resume/:section"
-          element={<DesignResumePage />}
+          element={
+            <AuthGuard requireNonClientRole>
+              <DesignResumePage />
+            </AuthGuard>
+          }
         />
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/offline" element={<OfflinePage />} />
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/tracer-links" element={<TracerLinksPage />} />
-        <Route path="/visa-sponsors" element={<VisaSponsorsPage />} />
+        <Route
+          path="/tracer-links"
+          element={
+            <AuthGuard requireNonClientRole>
+              <TracerLinksPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/visa-sponsors"
+          element={
+            <AuthGuard requiredRole="admin">
+              <VisaSponsorsPage />
+            </AuthGuard>
+          }
+        />
         <Route
           path="/tracking-inbox"
           element={
@@ -190,7 +215,14 @@ export const App: React.FC = () => {
             </AuthGuard>
           }
         />
-        <Route path="/watchlist" element={<WatchlistPage />} />
+        <Route
+          path="/watchlist"
+          element={
+            <AuthGuard requireNonClientRole>
+              <WatchlistPage />
+            </AuthGuard>
+          }
+        />
         <Route
           path="/agency/clients"
           element={

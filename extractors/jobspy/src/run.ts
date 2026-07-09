@@ -273,145 +273,159 @@ export async function runJobSpy(
           countryIndeed,
         });
 
-        await new Promise<void>((resolve, reject) => {
-          // Auto-detect venv if present, so contributors don't need to set
-          // PYTHON_PATH manually. The venv is created once with:
-          //   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-          // In Docker, PYTHON_PATH is set explicitly to /usr/bin/python3.
-          const venvPython = join(
-            EXTRACTOR_DIR,
-            ".venv",
-            process.platform === "win32" ? "Scripts/python.exe" : "bin/python3",
-          );
-          const pythonPath = process.env.PYTHON_PATH
-            ? process.env.PYTHON_PATH
-            : existsSync(venvPython)
-              ? venvPython
-              : process.platform === "win32"
-                ? "python"
-                : "python3";
-
-          const child = spawn(pythonPath, [JOBSPY_SCRIPT], {
-            cwd: EXTRACTOR_DIR,
-            shell: false,
-            stdio: ["ignore", "pipe", "pipe"],
-            env: {
-              ...process.env,
-              JOBSPY_SITES: sites || "indeed,linkedin,glassdoor",
-              JOBSPY_SEARCH_TERM: searchTerm,
-              JOBSPY_TERM_INDEX: String(runIndex),
-              JOBSPY_TERM_TOTAL: String(totalRuns),
-              JOBSPY_RESULTS_WANTED: String(
-                options.resultsWanted ??
-                  process.env.JOBSPY_RESULTS_WANTED ??
-                  200,
-              ),
-              JOBSPY_HOURS_OLD: String(
-                options.hoursOld ?? process.env.JOBSPY_HOURS_OLD ?? 72,
-              ),
-              JOBSPY_LINKEDIN_FETCH_DESCRIPTION: String(
-                options.linkedinFetchDescription ??
-                  process.env.JOBSPY_LINKEDIN_FETCH_DESCRIPTION ??
-                  "1",
-              ),
-              JOBSPY_IS_REMOTE: String(
-                options.isRemote ??
-                  deriveIsRemoteFlag(options.workplaceTypes) ??
-                  process.env.JOBSPY_IS_REMOTE ??
-                  "0",
-              ),
-              JOBSPY_OUTPUT_CSV: outputCsv,
-              JOBSPY_OUTPUT_JSON: outputJson,
-              ...(location ? { JOBSPY_LOCATION: location } : {}),
-              ...(siteLocations.linkedinLocation
-                ? { JOBSPY_LINKEDIN_LOCATION: siteLocations.linkedinLocation }
-                : {}),
-              ...(siteLocations.indeedLocation
-                ? { JOBSPY_INDEED_LOCATION: siteLocations.indeedLocation }
-                : {}),
-              ...(siteLocations.glassdoorLocation
-                ? { JOBSPY_GLASSDOOR_LOCATION: siteLocations.glassdoorLocation }
-                : {}),
-              ...(countryIndeed
-                ? { JOBSPY_COUNTRY_INDEED: countryIndeed }
-                : {}),
-            },
-          });
-
-          // Kill the child process if it exceeds the timeout. Without this,
-          // a hung HTTP request inside JobSpy blocks the entire pipeline.
-          const JOBSPY_PROCESS_TIMEOUT_MS =
-            Number.parseInt(
-              process.env.JOBSPY_PROCESS_TIMEOUT_MS ?? "",
-              10,
-            ) || 90_000;
-          const timeoutHandle = setTimeout(() => {
-            try {
-              child.kill("SIGTERM");
-              setTimeout(() => {
-                try {
-                  child.kill("SIGKILL");
-                } catch {
-                  // already dead
-                }
-              }, 5000);
-            } catch {
-              // already dead
-            }
-          }, JOBSPY_PROCESS_TIMEOUT_MS);
-
-          const handleLine = (line: string, stream: NodeJS.WriteStream) => {
-            const event = parseJobSpyProgressLine(line);
-            if (event) {
-              if (event.type === "source_error") {
-                sourceErrors.push(
-                  `${event.source}: ${event.error} (term: ${event.searchTerm})`,
-                );
-              }
-              options.onProgress?.(event);
-              return;
-            }
-            stream.write(`${line}\n`);
-          };
-
-          const stdoutRl = child.stdout
-            ? createInterface({ input: child.stdout })
-            : null;
-          const stderrRl = child.stderr
-            ? createInterface({ input: child.stderr })
-            : null;
-
-          stdoutRl?.on("line", (line) => handleLine(line, process.stdout));
-          stderrRl?.on("line", (line) => handleLine(line, process.stderr));
-
-          child.on("close", (code) => {
-            clearTimeout(timeoutHandle);
-            stdoutRl?.close();
-            stderrRl?.close();
-            if (code === 0) resolve();
-            else reject(new Error(`JobSpy exited with code ${code}`));
-          });
-          child.on("error", (err) => {
-            clearTimeout(timeoutHandle);
-            reject(err);
-          });
-        });
-
-        const raw = await readFile(outputJson, "utf-8");
-        const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
-        const filtered = mapJobSpyRows(parsed);
-
-        for (const job of filtered) {
-          if (seenJobUrls.has(job.jobUrl)) continue;
-          seenJobUrls.add(job.jobUrl);
-          jobs.push(job);
-        }
-
         try {
-          await unlink(outputJson);
-          await unlink(outputCsv);
-        } catch {
-          // ignore cleanup errors
+          await new Promise<void>((resolve, reject) => {
+            // Auto-detect venv if present, so contributors don't need to set
+            // PYTHON_PATH manually. The venv is created once with:
+            //   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+            // In Docker, PYTHON_PATH is set explicitly to /usr/bin/python3.
+            const venvPython = join(
+              EXTRACTOR_DIR,
+              ".venv",
+              process.platform === "win32"
+                ? "Scripts/python.exe"
+                : "bin/python3",
+            );
+            const pythonPath = process.env.PYTHON_PATH
+              ? process.env.PYTHON_PATH
+              : existsSync(venvPython)
+                ? venvPython
+                : process.platform === "win32"
+                  ? "python"
+                  : "python3";
+
+            const child = spawn(pythonPath, [JOBSPY_SCRIPT], {
+              cwd: EXTRACTOR_DIR,
+              shell: false,
+              stdio: ["ignore", "pipe", "pipe"],
+              env: {
+                ...process.env,
+                JOBSPY_SITES: sites || "indeed,linkedin,glassdoor",
+                JOBSPY_SEARCH_TERM: searchTerm,
+                JOBSPY_TERM_INDEX: String(runIndex),
+                JOBSPY_TERM_TOTAL: String(totalRuns),
+                JOBSPY_RESULTS_WANTED: String(
+                  options.resultsWanted ??
+                    process.env.JOBSPY_RESULTS_WANTED ??
+                    200,
+                ),
+                JOBSPY_HOURS_OLD: String(
+                  options.hoursOld ?? process.env.JOBSPY_HOURS_OLD ?? 72,
+                ),
+                JOBSPY_LINKEDIN_FETCH_DESCRIPTION: String(
+                  options.linkedinFetchDescription ??
+                    process.env.JOBSPY_LINKEDIN_FETCH_DESCRIPTION ??
+                    "1",
+                ),
+                JOBSPY_IS_REMOTE: String(
+                  options.isRemote ??
+                    deriveIsRemoteFlag(options.workplaceTypes) ??
+                    process.env.JOBSPY_IS_REMOTE ??
+                    "0",
+                ),
+                JOBSPY_OUTPUT_CSV: outputCsv,
+                JOBSPY_OUTPUT_JSON: outputJson,
+                ...(location ? { JOBSPY_LOCATION: location } : {}),
+                ...(siteLocations.linkedinLocation
+                  ? { JOBSPY_LINKEDIN_LOCATION: siteLocations.linkedinLocation }
+                  : {}),
+                ...(siteLocations.indeedLocation
+                  ? { JOBSPY_INDEED_LOCATION: siteLocations.indeedLocation }
+                  : {}),
+                ...(siteLocations.glassdoorLocation
+                  ? {
+                      JOBSPY_GLASSDOOR_LOCATION:
+                        siteLocations.glassdoorLocation,
+                    }
+                  : {}),
+                ...(countryIndeed
+                  ? { JOBSPY_COUNTRY_INDEED: countryIndeed }
+                  : {}),
+              },
+            });
+
+            // Kill the child process if it exceeds the timeout. Without this,
+            // a hung HTTP request inside JobSpy blocks the entire pipeline.
+            const JOBSPY_PROCESS_TIMEOUT_MS =
+              Number.parseInt(
+                process.env.JOBSPY_PROCESS_TIMEOUT_MS ?? "",
+                10,
+              ) || 90_000;
+            const timeoutHandle = setTimeout(() => {
+              try {
+                child.kill("SIGTERM");
+                setTimeout(() => {
+                  try {
+                    child.kill("SIGKILL");
+                  } catch {
+                    // already dead
+                  }
+                }, 5000);
+              } catch {
+                // already dead
+              }
+            }, JOBSPY_PROCESS_TIMEOUT_MS);
+
+            const handleLine = (line: string, stream: NodeJS.WriteStream) => {
+              const event = parseJobSpyProgressLine(line);
+              if (event) {
+                if (event.type === "source_error") {
+                  sourceErrors.push(
+                    `${event.source}: ${event.error} (term: ${event.searchTerm})`,
+                  );
+                }
+                options.onProgress?.(event);
+                return;
+              }
+              stream.write(`${line}\n`);
+            };
+
+            const stdoutRl = child.stdout
+              ? createInterface({ input: child.stdout })
+              : null;
+            const stderrRl = child.stderr
+              ? createInterface({ input: child.stderr })
+              : null;
+
+            stdoutRl?.on("line", (line) => handleLine(line, process.stdout));
+            stderrRl?.on("line", (line) => handleLine(line, process.stderr));
+
+            child.on("close", (code) => {
+              clearTimeout(timeoutHandle);
+              stdoutRl?.close();
+              stderrRl?.close();
+              if (code === 0) resolve();
+              else reject(new Error(`JobSpy exited with code ${code}`));
+            });
+            child.on("error", (err) => {
+              clearTimeout(timeoutHandle);
+              reject(err);
+            });
+          });
+
+          const raw = await readFile(outputJson, "utf-8");
+          const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
+          const filtered = mapJobSpyRows(parsed);
+
+          for (const job of filtered) {
+            if (seenJobUrls.has(job.jobUrl)) continue;
+            seenJobUrls.add(job.jobUrl);
+            jobs.push(job);
+          }
+
+          try {
+            await unlink(outputJson);
+            await unlink(outputCsv);
+          } catch {
+            // ignore cleanup errors
+          }
+        } finally {
+          try {
+            await unlink(outputJson);
+          } catch {}
+          try {
+            await unlink(outputCsv);
+          } catch {}
         }
 
         // Inter-term delay to reduce rate-limiting / IP ban risk. Skipped on

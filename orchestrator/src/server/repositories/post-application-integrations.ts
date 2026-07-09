@@ -6,6 +6,7 @@ import type {
 } from "@shared/types";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../db";
+import { logger } from "../infra/logger";
 import {
   clientDataScopeFilter,
   getPrivateDataScope,
@@ -116,6 +117,10 @@ export async function upsertConnectedPostApplicationIntegration(
         `Failed to load updated integration ${input.provider}/${input.accountKey}.`,
       );
     }
+    logger.warn(
+      "Post-application OAuth credentials stored without encryption — enable CREDENTIAL_VAULT_KEY for production",
+      { integrationId: updated.id },
+    );
     return updated;
   }
 
@@ -145,6 +150,10 @@ export async function upsertConnectedPostApplicationIntegration(
       `Failed to load created integration ${input.provider}/${input.accountKey}.`,
     );
   }
+  logger.warn(
+    "Post-application OAuth credentials stored without encryption — enable CREDENTIAL_VAULT_KEY for production",
+    { integrationId: created.id },
+  );
   return created;
 }
 
@@ -204,5 +213,15 @@ export async function updatePostApplicationIntegrationSyncState(
       ),
     );
 
-  return getPostApplicationIntegration(input.provider, input.accountKey);
+  const updated = await getPostApplicationIntegration(
+    input.provider,
+    input.accountKey,
+  );
+  if (updated && input.credentials !== undefined) {
+    logger.warn(
+      "Post-application OAuth credentials stored without encryption — enable CREDENTIAL_VAULT_KEY for production",
+      { integrationId: updated.id },
+    );
+  }
+  return updated;
 }

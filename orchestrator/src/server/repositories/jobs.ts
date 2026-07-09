@@ -79,7 +79,10 @@ function jobsScopeFilter() {
 }
 
 function jobNotesScopeFilter() {
-  return privateDataScopeFilter(jobNotes);
+  return and(
+    privateDataScopeFilter(jobNotes),
+    clientDataScopeFilter(jobNotes),
+  ) as SQL;
 }
 
 type AppliedDuplicateMatchCandidate = {
@@ -460,11 +463,19 @@ export async function createJobNote(
   const now = new Date().toISOString();
   const scope = getPrivateDataScope();
 
+  const job = await db
+    .select({ clientId: jobs.clientId })
+    .from(jobs)
+    .where(eq(jobs.id, input.jobId))
+    .limit(1);
+  const jobClientId = job[0]?.clientId ?? null;
+
   await db.insert(jobNotes).values({
     id,
     tenantId: scope.tenantId,
     userId: scope.userId,
     jobId: input.jobId,
+    clientId: jobClientId,
     title: input.title,
     content: input.content,
     createdAt: now,

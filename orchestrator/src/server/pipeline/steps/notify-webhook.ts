@@ -41,10 +41,18 @@ export async function notifyPipelineWebhookStep(
     });
 
     if (!response.ok) {
-      const responseText = await response.text().catch(() => "");
+      const sanitizedMessage = await response
+        .text()
+        .catch(() => "")
+        .then((text) =>
+          text
+            .replace(/[\r\n]+/g, " ")
+            .trim()
+            .slice(0, 100),
+        );
       logger.warn("Pipeline webhook POST failed", {
         status: response.status,
-        error: responseText.slice(0, 200),
+        message: sanitizedMessage || "Upstream request failed",
       });
     }
   } catch (error) {

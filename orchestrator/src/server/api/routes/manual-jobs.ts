@@ -17,6 +17,7 @@ import { generateJobBrief } from "@server/services/job-brief";
 import { inferManualJobDetails } from "@server/services/manualJob";
 import { getProfile } from "@server/services/profile";
 import { scoreJobSuitability } from "@server/services/scorer";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { settingsRegistry } from "@shared/settings-registry";
 import { type Request, type Response, Router } from "express";
 import { JSDOM } from "jsdom";
@@ -130,6 +131,7 @@ manualJobsRouter.post("/fetch", async (req: Request, res: Response) => {
   const timeout = setTimeout(() => controller.abort(), 15000);
 
   try {
+    requireNonClientRole();
     const input = manualJobFetchSchema.parse(req.body ?? {});
     const blockedLabel = getBlockedAutofetchLabel(input.url);
     if (blockedLabel) {
@@ -265,6 +267,7 @@ manualJobsRouter.post("/fetch", async (req: Request, res: Response) => {
  */
 manualJobsRouter.post("/infer", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const input = manualJobInferenceSchema.parse(req.body ?? {});
     const result = await inferManualJobDetails(input.jobDescription);
 
@@ -285,6 +288,7 @@ manualJobsRouter.post("/infer", async (req: Request, res: Response) => {
  */
 manualJobsRouter.post("/import", async (req: Request, res: Response) => {
   try {
+    requireNonClientRole();
     const input = manualJobImportSchema.parse(req.body ?? {});
     const job = input.job;
     const source = cleanOptional(job.source) ?? "manual";
@@ -305,9 +309,8 @@ manualJobsRouter.post("/import", async (req: Request, res: Response) => {
     if (getRole() === "worker") {
       const currentUserId = getUserId();
       if (currentUserId) {
-        const assignedClientIds = await getAssignedClientIdsForWorker(
-          currentUserId,
-        );
+        const assignedClientIds =
+          await getAssignedClientIdsForWorker(currentUserId);
         if (assignedClientIds.length === 1) {
           resolvedClientId = assignedClientIds[0];
           logger.info(

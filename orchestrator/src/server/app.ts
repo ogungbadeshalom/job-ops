@@ -18,11 +18,13 @@ import {
 } from "@infra/http";
 import { logger } from "@infra/logger";
 import { isAnalyticsDisabled } from "@infra/product-analytics";
+import { rateLimit } from "@infra/rate-limit";
 import { runWithRequestContext } from "@infra/request-context";
 import { sanitizeUnknown } from "@infra/sanitize";
 import { verifyToken } from "@server/auth/jwt";
 import { getJobOpsAppConfig } from "@server/config/app-mode";
 import { isDemoMode } from "@server/config/demo";
+import { rawDb } from "@server/db";
 import * as usersRepo from "@server/repositories/users";
 import { proxyChallengeViewerRequest } from "@server/services/challenge-viewer";
 import { DEFAULT_TENANT_ID } from "@server/tenancy/constants";
@@ -413,7 +415,8 @@ export function createApp() {
   // keep a larger JSON limit scoped to this endpoint to allow the maximum
   // validated payload through to route-level validation.
   app.use("/api/jobs/:id/chat", express.json({ limit: "12mb" }));
-  app.use(express.json());
+  // Default JSON body size for all other routes. Specific routes above override.
+  app.use(express.json({ limit: "2mb" }));
 
   // Logging middleware
   app.use((req, res, next) => {
@@ -429,6 +432,32 @@ export function createApp() {
     });
     next();
   });
+
+  // Rate limits on auth endpoints (public, so IP-keyed).
+  app.use(
+    "/api/auth/login",
+    rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 5,
+      message: "Too many login attempts. Please try again later.",
+    }),
+  );
+  app.use(
+    "/api/auth/signup",
+    rateLimit({
+      windowMs: 60 * 60 * 1000,
+      max: 3,
+      message: "Too many signup attempts. Please try again later.",
+    }),
+  );
+  app.use(
+    "/api/auth/setup",
+    rateLimit({
+      windowMs: 60 * 60 * 1000,
+      max: 3,
+      message: "Too many setup attempts. Please try again later.",
+    }),
+  );
 
   // Optional authentication for protected routes
   app.use(authGuard.middleware);
@@ -527,8 +556,18 @@ export function createApp() {
   });
 
   // Health check
-  app.get("/health", (_req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  app.get("/health", async (_req, res) => {
+    try {
+      rawDb.prepare("SELECT 1").get();
+      res.json({ status: "ok", timestamp: new Date().toISOString() });
+    } catch (error) {
+      logger.error("Health check failed", { error: sanitizeUnknown(error) });
+      res.status(503).json({
+        status: "degraded",
+        timestamp: new Date().toISOString(),
+        error: "Database unreachable",
+      });
+    }
   });
 
   // Serve client app in production
