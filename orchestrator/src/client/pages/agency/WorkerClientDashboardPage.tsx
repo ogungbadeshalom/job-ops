@@ -165,6 +165,18 @@ export const WorkerClientDashboardPage: React.FC = () => {
     enabled: Boolean(expandedJobId),
   });
 
+  const { data: dailyProgress } = useQuery({
+    queryKey: ["agency", "client", id, "progress", "day"],
+    queryFn: () => agencyApi.fetchClientProgress(id!, "day"),
+    enabled: Boolean(id),
+  });
+
+  const { data: weeklyProgress } = useQuery({
+    queryKey: ["agency", "client", id, "progress", "week"],
+    queryFn: () => agencyApi.fetchClientProgress(id!, "week"),
+    enabled: Boolean(id),
+  });
+
   const applyMutation = useMutation({
     mutationFn: api.markAsApplied,
     onSuccess: () => {
@@ -425,6 +437,44 @@ export const WorkerClientDashboardPage: React.FC = () => {
               </CardContent>
             </Card>
 
+            {(dailyProgress?.dailyTarget || weeklyProgress?.weeklyTarget) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Application Quota</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {dailyProgress?.dailyTarget && (
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-muted-foreground">Today</span>
+                        <span className="font-medium">
+                          {dailyProgress.applied}/{dailyProgress.dailyTarget}
+                        </span>
+                      </div>
+                      <ProgressBar
+                        value={dailyProgress.applied}
+                        max={dailyProgress.dailyTarget}
+                      />
+                    </div>
+                  )}
+                  {weeklyProgress?.weeklyTarget && (
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-muted-foreground">This Week</span>
+                        <span className="font-medium">
+                          {weeklyProgress.applied}/{weeklyProgress.weeklyTarget}
+                        </span>
+                      </div>
+                      <ProgressBar
+                        value={weeklyProgress.applied}
+                        max={weeklyProgress.weeklyTarget}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Jobs</CardTitle>
@@ -668,3 +718,15 @@ export const WorkerClientDashboardPage: React.FC = () => {
     </>
   );
 };
+
+function ProgressBar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div className="h-2 rounded-full bg-muted overflow-hidden">
+      <div
+        className="h-full rounded-full bg-primary transition-all"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}

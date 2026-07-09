@@ -7,6 +7,7 @@ import { revokeAuthSessionsForUser } from "@server/repositories/auth-sessions";
 import {
   createClient,
   deleteClient,
+  getClientApplicationProgress,
   getClientById,
   getClientJobCount,
   getClientLoginStatus,
@@ -37,6 +38,8 @@ const createClientSchema = z.object({
   workplaceTypes: z.array(z.string()).optional(),
   searchCities: z.array(z.string()).optional(),
   enableTailoring: z.boolean().optional(),
+  dailyApplicationTarget: z.number().int().min(0).max(1000).optional(),
+  weeklyApplicationTarget: z.number().int().min(0).max(5000).optional(),
 });
 
 const updateClientSchema = z.object({
@@ -48,6 +51,8 @@ const updateClientSchema = z.object({
   searchCities: z.array(z.string()).optional(),
   enableTailoring: z.boolean().optional(),
   status: z.enum(["active", "inactive", "archived"]).optional(),
+  dailyApplicationTarget: z.number().int().min(0).max(1000).optional(),
+  weeklyApplicationTarget: z.number().int().min(0).max(5000).optional(),
 });
 
 clientsRouter.get(
@@ -126,6 +131,8 @@ clientsRouter.post(
       workplaceTypes: JSON.stringify(parsed.data.workplaceTypes ?? []),
       searchCities: JSON.stringify(parsed.data.searchCities ?? []),
       enableTailoring: parsed.data.enableTailoring ?? true,
+      dailyApplicationTarget: parsed.data.dailyApplicationTarget,
+      weeklyApplicationTarget: parsed.data.weeklyApplicationTarget,
       createdBy: userId,
     } as NewClientRow);
 
@@ -164,6 +171,10 @@ clientsRouter.patch(
       updateData.enableTailoring = parsed.data.enableTailoring;
     if (parsed.data.status !== undefined)
       updateData.status = parsed.data.status;
+    if (parsed.data.dailyApplicationTarget !== undefined)
+      updateData.dailyApplicationTarget = parsed.data.dailyApplicationTarget;
+    if (parsed.data.weeklyApplicationTarget !== undefined)
+      updateData.weeklyApplicationTarget = parsed.data.weeklyApplicationTarget;
 
     const client = await updateClient(req.params.id, updateData);
     if (!client) {
@@ -260,5 +271,28 @@ clientsRouter.get(
 
     const stats = await getClientJobCount(req.params.id);
     ok(res, { stats });
+  }),
+);
+
+clientsRouter.get(
+  "/:id/progress",
+  asyncRoute(async (req: Request, res: Response) => {
+    requireRole("admin", "owner", "worker");
+    const clientId = req.params.id;
+    const userId = getUserId();
+    if (!userId)
+      return fail(res, forbidden("Authenticated user context is required"));
+
+    // Workers can only see progress for assigned clients
+    if (getRole() === "worker") {
+      const assigned = await isWorkerAssignedToClient(userId, clientId);
+      if (!assigned) return fail(res, forbidden("Not assigned to this client"));
+    }
+
+    const period = (req.query.period === "week" ? "week" : "day") as
+      | "day"
+      | "week";
+    const progress = await getClientApplicationProgress(clientId, period);
+    ok(res, progress);
   }),
 );

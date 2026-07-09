@@ -109,6 +109,8 @@ export const clients = sqliteTable(
     enableTailoring: integer("enable_tailoring", { mode: "boolean" })
       .notNull()
       .default(true),
+    dailyApplicationTarget: integer("daily_application_target"),
+    weeklyApplicationTarget: integer("weekly_application_target"),
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),

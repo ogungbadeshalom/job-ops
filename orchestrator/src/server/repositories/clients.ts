@@ -56,6 +56,8 @@ export async function listClients(): Promise<ClientWithAssignment[]> {
       workplaceTypes: clients.workplaceTypes,
       searchCities: clients.searchCities,
       enableTailoring: clients.enableTailoring,
+      dailyApplicationTarget: clients.dailyApplicationTarget,
+      weeklyApplicationTarget: clients.weeklyApplicationTarget,
       createdBy: clients.createdBy,
       createdAt: clients.createdAt,
       updatedAt: clients.updatedAt,
@@ -96,6 +98,8 @@ export async function listClientsForWorker(
       workplaceTypes: clients.workplaceTypes,
       searchCities: clients.searchCities,
       enableTailoring: clients.enableTailoring,
+      dailyApplicationTarget: clients.dailyApplicationTarget,
+      weeklyApplicationTarget: clients.weeklyApplicationTarget,
       createdBy: clients.createdBy,
       createdAt: clients.createdAt,
       updatedAt: clients.updatedAt,
@@ -164,6 +168,8 @@ export async function createClient(input: NewClientRow): Promise<ClientRow> {
     workplaceTypes: input.workplaceTypes ?? "[]",
     searchCities: input.searchCities ?? "[]",
     enableTailoring: input.enableTailoring ?? true,
+    dailyApplicationTarget: input.dailyApplicationTarget ?? null,
+    weeklyApplicationTarget: input.weeklyApplicationTarget ?? null,
     createdBy: input.createdBy,
     createdAt: now,
     updatedAt: now,
@@ -249,6 +255,54 @@ export async function setClientCreatedBy(
     .set({ createdBy: userId, updatedAt: new Date().toISOString() })
     .where(and(eq(clients.id, clientId), eq(clients.tenantId, tenantId)));
   return getClientById(clientId);
+}
+
+export async function getClientApplicationProgress(
+  clientId: string,
+  period: "day" | "week",
+): Promise<{
+  applied: number;
+  dailyTarget: number | null;
+  weeklyTarget: number | null;
+}> {
+  const tenantId = getActiveTenantId();
+  const client = await getClientById(clientId);
+  if (!client) {
+    return { applied: 0, dailyTarget: null, weeklyTarget: null };
+  }
+
+  const now = new Date();
+  let periodStart: Date;
+  if (period === "day") {
+    periodStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+  } else {
+    const dayOfWeek = now.getUTCDay(); // 0=Sun
+    periodStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    periodStart.setUTCDate(periodStart.getUTCDate() - dayOfWeek);
+  }
+
+  const { jobs } = schema;
+  const [row] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(jobs)
+    .where(
+      and(
+        eq(jobs.clientId, clientId),
+        eq(jobs.tenantId, tenantId),
+        eq(jobs.status, "applied"),
+        sql`${jobs.appliedAt} >= ${periodStart.toISOString()}`,
+      ),
+    );
+
+  return {
+    applied: row?.count ?? 0,
+    dailyTarget: client.dailyApplicationTarget ?? null,
+    weeklyTarget: client.weeklyApplicationTarget ?? null,
+  };
 }
 
 export async function getClientJobCount(clientId: string): Promise<{

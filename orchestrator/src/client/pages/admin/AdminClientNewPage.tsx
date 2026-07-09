@@ -20,6 +20,8 @@ export const AdminClientNewPage: React.FC = () => {
   const [notes, setNotes] = React.useState("");
   const [searchTermsInput, setSearchTermsInput] = React.useState("");
   const [enableTailoring, setEnableTailoring] = React.useState(true);
+  const [dailyTarget, setDailyTarget] = React.useState("");
+  const [weeklyTarget, setWeeklyTarget] = React.useState("");
 
   const createMutation = useMutation({
     mutationFn: (data: api.CreateClientInput) => api.createClient(data),
@@ -47,6 +49,12 @@ export const AdminClientNewPage: React.FC = () => {
       notes: notes.trim() || undefined,
       searchTerms: searchTerms.length > 0 ? searchTerms : undefined,
       enableTailoring,
+      dailyApplicationTarget: dailyTarget
+        ? parseInt(dailyTarget, 10)
+        : undefined,
+      weeklyApplicationTarget: weeklyTarget
+        ? parseInt(weeklyTarget, 10)
+        : undefined,
     });
   };
 
@@ -129,7 +137,7 @@ export const AdminClientNewPage: React.FC = () => {
               Enable Resume Tailoring
             </Label>
             <p className="text-xs text-muted-foreground">
-              Automatically tailor resumes for this client's jobs.
+              Automatically tailor resumes for this client&apos;s jobs.
             </p>
           </div>
           <Switch
@@ -138,6 +146,38 @@ export const AdminClientNewPage: React.FC = () => {
             onCheckedChange={setEnableTailoring}
             disabled={isPending}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="dailyTarget">Daily Application Target</Label>
+          <Input
+            id="dailyTarget"
+            type="number"
+            min={0}
+            value={dailyTarget}
+            onChange={(e) => setDailyTarget(e.target.value)}
+            placeholder="e.g. 50"
+            disabled={isPending}
+          />
+          <p className="text-xs text-muted-foreground">
+            Optional daily application goal for this client.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="weeklyTarget">Weekly Application Target</Label>
+          <Input
+            id="weeklyTarget"
+            type="number"
+            min={0}
+            value={weeklyTarget}
+            onChange={(e) => setWeeklyTarget(e.target.value)}
+            placeholder="e.g. 250"
+            disabled={isPending}
+          />
+          <p className="text-xs text-muted-foreground">
+            Optional weekly application goal for this client.
+          </p>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

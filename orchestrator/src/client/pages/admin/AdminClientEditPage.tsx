@@ -41,6 +41,8 @@ export const AdminClientEditPage: React.FC = () => {
   const [status, setStatus] = useState<string>("active");
   const [searchTermsInput, setSearchTermsInput] = useState("");
   const [enableTailoring, setEnableTailoring] = useState(true);
+  const [dailyTarget, setDailyTarget] = useState("");
+  const [weeklyTarget, setWeeklyTarget] = useState("");
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [currentAssignmentId, setCurrentAssignmentId] = useState<string | null>(
     null,
@@ -81,6 +83,8 @@ export const AdminClientEditPage: React.FC = () => {
       setNotes(client.notes ?? "");
       setStatus(client.status ?? "active");
       setEnableTailoring(client.enableTailoring ?? true);
+      setDailyTarget(client.dailyApplicationTarget?.toString() ?? "");
+      setWeeklyTarget(client.weeklyApplicationTarget?.toString() ?? "");
       try {
         const terms = JSON.parse(client.searchTerms ?? "[]");
         setSearchTermsInput(Array.isArray(terms) ? terms.join(", ") : "");
@@ -114,6 +118,12 @@ export const AdminClientEditPage: React.FC = () => {
         status: status as api.UpdateClientInput["status"],
         searchTerms,
         enableTailoring,
+        dailyApplicationTarget: dailyTarget
+          ? parseInt(dailyTarget, 10)
+          : undefined,
+        weeklyApplicationTarget: weeklyTarget
+          ? parseInt(weeklyTarget, 10)
+          : undefined,
       });
     },
     onSuccess: async () => {
@@ -337,7 +347,7 @@ export const AdminClientEditPage: React.FC = () => {
               Enable Resume Tailoring
             </Label>
             <p className="text-xs text-muted-foreground">
-              Automatically tailor resumes for this client's jobs.
+              Automatically tailor resumes for this client&apos;s jobs.
             </p>
           </div>
           <Switch
@@ -346,6 +356,38 @@ export const AdminClientEditPage: React.FC = () => {
             onCheckedChange={setEnableTailoring}
             disabled={isSaving}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="dailyTarget">Daily Application Target</Label>
+          <Input
+            id="dailyTarget"
+            type="number"
+            min={0}
+            value={dailyTarget}
+            onChange={(e) => setDailyTarget(e.target.value)}
+            placeholder="e.g. 50"
+            disabled={isSaving}
+          />
+          <p className="text-xs text-muted-foreground">
+            Optional daily application goal for this client.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="weeklyTarget">Weekly Application Target</Label>
+          <Input
+            id="weeklyTarget"
+            type="number"
+            min={0}
+            value={weeklyTarget}
+            onChange={(e) => setWeeklyTarget(e.target.value)}
+            placeholder="e.g. 250"
+            disabled={isSaving}
+          />
+          <p className="text-xs text-muted-foreground">
+            Optional weekly application goal for this client.
+          </p>
         </div>
 
         <Separator />

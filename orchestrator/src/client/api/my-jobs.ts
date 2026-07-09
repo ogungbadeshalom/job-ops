@@ -18,3 +18,11 @@ export async function fetchMyJobStageEvents(id: string): Promise<StageEvent[]> {
     withQuery(`/jobs/${id}/events`, { t: Date.now() }),
   );
 }
+
+export async function fetchMyProgress(period: "day" | "week") {
+  return fetchApi<{
+    applied: number;
+    dailyTarget: number | null;
+    weeklyTarget: number | null;
+  }>(`/my-jobs/progress?period=${period}`);
+}

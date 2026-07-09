@@ -14,6 +14,12 @@ export interface ClientStats {
   offer: number;
 }
 
+export interface ClientProgress {
+  applied: number;
+  dailyTarget: number | null;
+  weeklyTarget: number | null;
+}
+
 interface ClientsListResponse {
   clients: ClientWithAssignment[];
 }
@@ -43,6 +49,8 @@ export interface CreateClientInput {
   workplaceTypes?: string[];
   searchCities?: string[];
   enableTailoring?: boolean;
+  dailyApplicationTarget?: number;
+  weeklyApplicationTarget?: number;
 }
 
 export interface UpdateClientInput {
@@ -54,6 +62,8 @@ export interface UpdateClientInput {
   searchCities?: string[];
   enableTailoring?: boolean;
   status?: "active" | "inactive" | "archived";
+  dailyApplicationTarget?: number;
+  weeklyApplicationTarget?: number;
 }
 
 export async function fetchMyClients(): Promise<ClientWithAssignment[]> {
@@ -79,6 +89,15 @@ export async function fetchClient(
 export async function fetchClientStats(id: string): Promise<ClientStats> {
   const response = await fetchApi<ClientStatsResponse>(`/clients/${id}/stats`);
   return response.stats;
+}
+
+export async function fetchClientProgress(
+  clientId: string,
+  period: "day" | "week",
+): Promise<ClientProgress> {
+  return fetchApi<ClientProgress>(
+    `/clients/${encodeURIComponent(clientId)}/progress?period=${period}`,
+  );
 }
 
 export async function createClient(

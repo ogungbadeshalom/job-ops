@@ -1692,6 +1692,17 @@ function ensureAgencyTables(): void {
     );
   }
 
+  if (!tableHasColumn("clients", "daily_application_target")) {
+    sqlite.exec(
+      "ALTER TABLE clients ADD COLUMN daily_application_target INTEGER",
+    );
+  }
+  if (!tableHasColumn("clients", "weekly_application_target")) {
+    sqlite.exec(
+      "ALTER TABLE clients ADD COLUMN weekly_application_target INTEGER",
+    );
+  }
+
   if (!tableExists("worker_client_assignments")) {
     sqlite.exec(`
       CREATE TABLE worker_client_assignments (

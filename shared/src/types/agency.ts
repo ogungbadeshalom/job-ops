@@ -36,6 +36,8 @@ export interface Client {
   workplaceTypes: string;
   searchCities: string;
   enableTailoring: boolean;
+  dailyApplicationTarget: number | null;
+  weeklyApplicationTarget: number | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -61,6 +63,8 @@ export interface CreateClientInput {
   workplaceTypes?: string[];
   searchCities?: string[];
   enableTailoring?: boolean;
+  dailyApplicationTarget?: number;
+  weeklyApplicationTarget?: number;
 }
 
 export interface UpdateClientInput {
@@ -72,6 +76,8 @@ export interface UpdateClientInput {
   searchCities?: string[];
   enableTailoring?: boolean;
   status?: ClientStatus;
+  dailyApplicationTarget?: number;
+  weeklyApplicationTarget?: number;
 }
 
 export interface CreateAssignmentInput {

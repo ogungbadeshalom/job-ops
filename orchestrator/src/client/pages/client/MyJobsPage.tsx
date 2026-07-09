@@ -1,5 +1,7 @@
+import * as api from "@client/api";
 import { useClientJobs } from "@client/hooks/useClientJob";
-import type { Job, JobStatus } from "@shared/types";
+import type { Job } from "@shared/types";
+import { useQuery } from "@tanstack/react-query";
 import {
   BriefcaseBusiness,
   CheckCircle2,
@@ -9,9 +11,10 @@ import {
   Send,
 } from "lucide-react";
 import type React from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobStatusBadge } from "../orchestrator/JobStatusBadge";
 
@@ -54,44 +57,94 @@ function getScoreColor(score: number): string {
 
 export const MyJobsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [period, setPeriod] = useState<"all" | "today" | "week">("all");
 
   const { data: jobsResponse, isLoading } = useClientJobs();
 
+  const jobs: Job[] = jobsResponse?.jobs ?? [];
+
+  const filteredJobs = useMemo(() => {
+    if (period === "all") return jobs;
+    const now = new Date();
+    let since: Date;
+    if (period === "today") {
+      since = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+      );
+    } else {
+      const dow = now.getUTCDay();
+      since = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+      );
+      since.setUTCDate(since.getUTCDate() - dow);
+    }
+    return jobs.filter((j) => {
+      const dt = j.appliedAt || j.discoveredAt;
+      return dt && new Date(dt) >= since;
+    });
+  }, [jobs, period]);
+
+  const displayJobs = filteredJobs
+    .filter((j) => j.employer && j.employer.trim())
+    .sort((a, b) => {
+      const aDate = (a.appliedAt || a.discoveredAt || "") as string;
+      const bDate = (b.appliedAt || b.discoveredAt || "") as string;
+      return bDate.localeCompare(aDate);
+    });
+
   const stats = useMemo(() => {
-    const byStatus =
-      jobsResponse?.byStatus ?? ({} as Record<JobStatus, number>);
-    const total = jobsResponse?.total ?? 0;
-    const applied = (byStatus.applied ?? 0) + (byStatus.in_progress ?? 0);
+    const totalJobs = filteredJobs.length;
+    const applied = filteredJobs.filter((j) =>
+      ["applied", "in_progress", "offer"].includes(j.status),
+    ).length;
+    const inProgress = filteredJobs.filter((j) =>
+      ["in_progress", "interviewing"].includes(j.status),
+    ).length;
+    const ready = filteredJobs.filter((j) => j.status === "ready").length;
 
     return [
       {
-        label: "Total Applications",
-        value: total,
+        label: "Total Jobs",
+        value: totalJobs,
         icon: BriefcaseBusiness,
         color: "text-sky-400",
       },
       {
-        label: "Applied",
+        label: "Applications",
         value: applied,
         icon: Send,
         color: "text-blue-400",
       },
       {
         label: "In Progress",
-        value: byStatus.in_progress ?? 0,
+        value: inProgress,
         icon: MessageSquareText,
         color: "text-cyan-400",
       },
       {
         label: "Ready",
-        value: byStatus.ready ?? 0,
+        value: ready,
         icon: CheckCircle2,
         color: "text-emerald-400",
       },
     ];
-  }, [jobsResponse]);
+  }, [filteredJobs]);
 
-  const jobs: Job[] = jobsResponse?.jobs ?? [];
+  const clientId = jobs[0]?.clientId;
+
+  const { data: dailyProgress } = useQuery({
+    queryKey: ["client", "my-progress", "day"],
+    queryFn: () => api.fetchMyProgress("day"),
+    enabled: Boolean(clientId),
+    staleTime: 30_000,
+  });
+
+  const { data: weeklyProgress } = useQuery({
+    queryKey: ["client", "my-progress", "week"],
+    queryFn: () => api.fetchMyProgress("week"),
+    enabled: Boolean(clientId),
+    staleTime: 30_000,
+  });
 
   if (isLoading) {
     return (
@@ -111,6 +164,21 @@ export const MyJobsPage: React.FC = () => {
         <p className="mt-1 text-sm text-muted-foreground">
           Track the status of your job applications
         </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(["today", "week", "all"] as const).map((p) => (
+          <Button
+            key={p}
+            variant={period === p ? "default" : "outline"}
+            size="sm"
+            onClick={() => setPeriod(p)}
+          >
+            {p === "today" && "Today"}
+            {p === "week" && "This Week"}
+            {p === "all" && "All Time"}
+          </Button>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -135,15 +203,53 @@ export const MyJobsPage: React.FC = () => {
         ))}
       </div>
 
+      {(dailyProgress?.dailyTarget || weeklyProgress?.weeklyTarget) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Application Quota</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {dailyProgress?.dailyTarget && (
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">Today</span>
+                  <span className="font-medium">
+                    {dailyProgress.applied}/{dailyProgress.dailyTarget}
+                  </span>
+                </div>
+                <ProgressBar
+                  value={dailyProgress.applied}
+                  max={dailyProgress.dailyTarget}
+                />
+              </div>
+            )}
+            {weeklyProgress?.weeklyTarget && (
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">This Week</span>
+                  <span className="font-medium">
+                    {weeklyProgress.applied}/{weeklyProgress.weeklyTarget}
+                  </span>
+                </div>
+                <ProgressBar
+                  value={weeklyProgress.applied}
+                  max={weeklyProgress.weeklyTarget}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-lg">Applications</CardTitle>
           <span className="text-sm text-muted-foreground">
-            {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+            {displayJobs.length} job{displayJobs.length !== 1 ? "s" : ""}
           </span>
         </CardHeader>
         <CardContent className="p-0">
-          {jobs.length === 0 ? (
+          {displayJobs.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
               <FileText className="h-10 w-10 text-muted-foreground/50" />
               <div className="text-base font-semibold">No applications yet</div>
@@ -153,7 +259,7 @@ export const MyJobsPage: React.FC = () => {
             </div>
           ) : (
             <div className="divide-y divide-border/60">
-              {jobs.map((job) => (
+              {displayJobs.map((job) => (
                 <button
                   key={job.id}
                   type="button"
@@ -204,3 +310,15 @@ export const MyJobsPage: React.FC = () => {
     </main>
   );
 };
+
+function ProgressBar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div className="h-2 rounded-full bg-muted overflow-hidden">
+      <div
+        className="h-full rounded-full bg-primary transition-all"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
