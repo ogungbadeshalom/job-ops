@@ -2,7 +2,6 @@ import { getRoleFromToken, isAdminFromToken } from "@client/lib/jwt";
 import {
   Building2,
   ClipboardList,
-  Columns3,
   Home,
   Inbox,
   LayoutDashboard,
@@ -24,12 +23,6 @@ const WORKER_NAV: NavLink[] = [
     label: "Jobs",
     icon: LayoutDashboard,
     activePaths: ["/jobs/ready", "/jobs/discovered", "/jobs/applied"],
-  },
-  {
-    to: "/applications/in-progress",
-    label: "Pipeline Board",
-    icon: Columns3,
-    activePaths: ["/applications/in-progress"],
   },
 ];
 
@@ -97,12 +90,6 @@ export function getNavLinks(): NavLink[] {
         label: "Jobs",
         icon: LayoutDashboard,
         activePaths: ["/jobs/ready", "/jobs/discovered", "/jobs/applied"],
-      },
-      {
-        to: "/applications/in-progress",
-        label: "Pipeline Board",
-        icon: Columns3,
-        activePaths: ["/applications/in-progress"],
       },
       { to: "/tracking-inbox", label: "Tracking Inbox", icon: Inbox },
       { to: "/settings", label: settingsLabel, icon: Settings },

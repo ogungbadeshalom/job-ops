@@ -44,6 +44,7 @@ function makeInboxItem() {
       relevanceLlmScore: 95,
       relevanceDecision: "relevant" as const,
       matchedJobId: "job-2",
+      clientId: null,
       matchConfidence: 95,
       stageTarget: "technical_interview" as const,
       messageType: "interview" as const,
@@ -167,6 +168,7 @@ beforeEach(() => {
       ...makeInboxItem().message,
       processingStatus: "ignored",
       matchedJobId: null,
+      clientId: null,
     },
   });
   vi.mocked(api.getPostApplicationRunMessages).mockResolvedValue({

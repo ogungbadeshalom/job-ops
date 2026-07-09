@@ -544,6 +544,20 @@ export const settingsRegistry = {
     serialize: (value: string | null | undefined): string | null =>
       value ?? null,
   },
+  pipelineTopN: {
+    kind: "typed" as const,
+    schema: z.number().int().min(1).max(200),
+    default: (): number => 50,
+    parse: parseIntOrNull,
+    serialize: serializeNullableNumber,
+  },
+  pipelineMinSuitabilityScore: {
+    kind: "typed" as const,
+    schema: z.number().int().min(0).max(100),
+    default: (): number => 30,
+    parse: parseIntOrNull,
+    serialize: serializeNullableNumber,
+  },
   ghostwriterSystemPromptTemplate: {
     kind: "typed" as const,
     schema: z.string().trim().max(12000),

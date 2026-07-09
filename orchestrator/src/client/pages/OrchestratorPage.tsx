@@ -1,7 +1,14 @@
+import { fetchAdminStats } from "@client/api/admin-stats";
 import { ManualImportSheet } from "@client/components/ManualImportSheet";
 import { useSettings } from "@client/hooks/useSettings";
+import { isAdminFromToken } from "@client/lib/jwt";
+import { useQuery } from "@tanstack/react-query";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
+import {
+  ClientNameContext,
+  type ClientNameMap,
+} from "./orchestrator/ClientNameContext";
 import { OrchestratorHeader } from "./orchestrator/OrchestratorHeader";
 import { OrchestratorJobWorkspaceContainer } from "./orchestrator/OrchestratorJobWorkspaceContainer";
 import { OrchestratorSearchComposer } from "./orchestrator/OrchestratorSearchComposer";
@@ -19,12 +26,28 @@ import { useWatchlistPipelineSources } from "./orchestrator/useWatchlistPipeline
 import { getEnabledSources } from "./orchestrator/utils";
 
 export const OrchestratorPage: React.FC = () => {
+  const isAdmin = isAdminFromToken();
   const [isManualImportOpen, setIsManualImportOpen] = useState(false);
   const filters = useOrchestratorFilters();
   const navigation = useOrchestratorNavigation({
     searchParams: filters.searchParams,
   });
   const { settings } = useSettings();
+
+  // Fetch client list once for admin so job rows can show client name badges.
+  const { data: adminStats } = useQuery({
+    queryKey: ["admin", "stats"],
+    queryFn: fetchAdminStats,
+    enabled: isAdmin,
+  });
+  const clientNameMap = useMemo<ClientNameMap | null>(() => {
+    if (!isAdmin || !adminStats?.clients) return null;
+    const map = new Map<string, string>();
+    for (const c of adminStats.clients) {
+      map.set(c.id, c.name);
+    }
+    return map;
+  }, [isAdmin, adminStats]);
   const {
     jobs,
     selectedJob,
@@ -99,14 +122,19 @@ export const OrchestratorPage: React.FC = () => {
   ]);
 
   return (
-    <>
+    <ClientNameContext.Provider value={clientNameMap}>
       <OrchestratorHeader
         isPipelineRunning={isPipelineRunning}
         isCancelling={isCancelling}
         pipelineSources={pipelineSources}
-        hideRunAction={isSearchComposerVisible && !canToggleSearchComposer}
+        hideRunAction={
+          isAdminFromToken() ||
+          (isSearchComposerVisible && !canToggleSearchComposer)
+        }
         isSearchComposerOpen={
-          isSearchComposerVisible && canToggleSearchComposer
+          !isAdminFromToken() &&
+          isSearchComposerVisible &&
+          canToggleSearchComposer
         }
         onOpenAutomaticRun={handleToggleAutomaticRun}
         onCancelPipeline={handleCancelPipeline}
@@ -164,6 +192,6 @@ export const OrchestratorPage: React.FC = () => {
           await handleManualImported(result);
         }}
       />
-    </>
+    </ClientNameContext.Provider>
   );
 };

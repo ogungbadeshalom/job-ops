@@ -102,6 +102,11 @@ const EmailViewerRow: React.FC<EmailViewerRowProps> = ({
               {item.message.fromAddress} ·{" "}
               {formatEpochMs(item.message.receivedAt)}
             </p>
+            {item.clientName && (
+              <span className="mt-1 inline-flex items-center gap-1 rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-200">
+                {item.clientName}
+              </span>
+            )}
           </div>
         </div>
 

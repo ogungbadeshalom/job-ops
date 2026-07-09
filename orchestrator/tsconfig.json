@@ -20,7 +20,13 @@
       "@career-boards/bamboohr": ["../career-boards/bamboohr/src/index.ts"],
       "@career-boards/bamboohr/*": ["../career-boards/bamboohr/src/*"],
       "@career-boards/workday": ["../career-boards/workday/src/index.ts"],
-      "@career-boards/workday/*": ["../career-boards/workday/src/*"]
+      "@career-boards/workday/*": ["../career-boards/workday/src/*"],
+      "@career-boards/greenhouse": ["../career-boards/greenhouse/src/index.ts"],
+      "@career-boards/greenhouse/*": ["../career-boards/greenhouse/src/*"],
+      "@career-boards/lever": ["../career-boards/lever/src/index.ts"],
+      "@career-boards/lever/*": ["../career-boards/lever/src/*"],
+      "@career-boards/ashby": ["../career-boards/ashby/src/index.ts"],
+      "@career-boards/ashby/*": ["../career-boards/ashby/src/*"]
     }
   },
   "include": ["src/**/*", "scripts/**/*", "../career-boards/**/*.ts"],

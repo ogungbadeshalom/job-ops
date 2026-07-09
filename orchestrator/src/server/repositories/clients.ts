@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getActiveTenantId } from "@server/tenancy/context";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "../db";
 
 const { clients, tenantMemberships, workerClientAssignments, users } = schema;
@@ -21,6 +21,23 @@ export async function getClientById(id: string): Promise<ClientRow | null> {
     .where(and(eq(clients.id, id), eq(clients.tenantId, tenantId)))
     .limit(1);
   return row ?? null;
+}
+
+export async function getClientNamesByIds(
+  clientIds: string[],
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const unique = Array.from(new Set(clientIds.filter(Boolean)));
+  if (unique.length === 0) return result;
+  const tenantId = getActiveTenantId();
+  const rows = await db
+    .select({ id: clients.id, name: clients.name })
+    .from(clients)
+    .where(and(eq(clients.tenantId, tenantId), inArray(clients.id, unique)));
+  for (const row of rows) {
+    result.set(row.id, row.name);
+  }
+  return result;
 }
 
 export async function listClients(): Promise<ClientWithAssignment[]> {
@@ -234,9 +251,7 @@ export async function setClientCreatedBy(
   return getClientById(clientId);
 }
 
-export async function getClientJobCount(
-  clientId: string,
-): Promise<{
+export async function getClientJobCount(clientId: string): Promise<{
   total: number;
   applied: number;
   interviewing: number;

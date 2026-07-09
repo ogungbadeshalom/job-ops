@@ -62,10 +62,20 @@ import {
 } from "./steps";
 
 const DEFAULT_CONFIG: PipelineConfig = {
-  topN: 10,
-  minSuitabilityScore: 50,
-  // Keep Glassdoor opt-in via source picker/settings; do not enable by default.
-  sources: ["gradcracker", "indeed", "linkedin", "ukvisajobs"],
+  topN: 50,
+  minSuitabilityScore: 30,
+  // Broad coverage of free sources; paid/API-key sources (adzuna, seek) stay opt-in.
+  sources: [
+    "gradcracker",
+    "indeed",
+    "linkedin",
+    "ukvisajobs",
+    "hiringcafe",
+    "golangjobs",
+    "startupjobs",
+    "workingnomads",
+    "wazzuf",
+  ],
   outputDir: join(getDataDir(), "pdfs"),
   enableCrawling: true,
   enableScoring: true,
@@ -88,6 +98,7 @@ function parseProjectIdsCsv(value: string | null | undefined): string[] {
 
 type TenantPipelineState = {
   isRunning: boolean;
+  startedAt: number | null;
   activePipelineRunId: string | null;
   cancelRequestedAt: string | null;
   activeChallengeState: ChallengeState | null;
@@ -116,6 +127,7 @@ function getPipelineState(
   if (!state) {
     state = {
       isRunning: false,
+      startedAt: null,
       activePipelineRunId: null,
       cancelRequestedAt: null,
       activeChallengeState: null,
@@ -263,6 +275,26 @@ export async function runPipeline(
 }> {
   const scopeKey = getPipelineScopeKey();
   const tenantState = getPipelineState(scopeKey);
+
+  // Stale-lock recovery: if a previous run has been "running" for more than
+  // 10 minutes, it almost certainly crashed without cleaning up. Force-clear
+  // the lock so the user isn't permanently blocked.
+  const STALE_LOCK_MS = 10 * 60 * 1000;
+  if (
+    tenantState.isRunning &&
+    tenantState.startedAt != null &&
+    Date.now() - tenantState.startedAt > STALE_LOCK_MS
+  ) {
+    logger.warn("Pipeline stale lock detected — forcing reset", {
+      scopeKey,
+      startedAt: tenantState.startedAt,
+      ageMs: Date.now() - (tenantState.startedAt ?? 0),
+    });
+    tenantState.isRunning = false;
+    tenantState.startedAt = null;
+    tenantState.activePipelineRunId = null;
+  }
+
   if (tenantState.isRunning) {
     if (options?.hostedUsageReservationId) {
       await settleHostedUsageReservation({
@@ -279,11 +311,43 @@ export async function runPipeline(
   }
 
   tenantState.isRunning = true;
+  tenantState.startedAt = Date.now();
   tenantState.activePipelineRunId = "pending";
   tenantState.cancelRequestedAt = null;
   resetProgress();
   const locationIntent = await resolveLocationIntent(config);
-  const mergedConfig = { ...DEFAULT_CONFIG, ...config, locationIntent };
+
+  // Read persisted pipeline settings so admin-configured values take effect
+  // when the API request doesn't override them explicitly.
+  const pipelineSettings = await settingsRepo.getAllSettings();
+  const settingsDefaults: Partial<PipelineConfig> = {};
+  const settingsTopN = pipelineSettings.pipelineTopN
+    ? parseInt(pipelineSettings.pipelineTopN, 10)
+    : null;
+  if (
+    Number.isFinite(settingsTopN) &&
+    settingsTopN != null &&
+    config.topN == null
+  ) {
+    settingsDefaults.topN = settingsTopN;
+  }
+  const settingsMinScore = pipelineSettings.pipelineMinSuitabilityScore
+    ? parseInt(pipelineSettings.pipelineMinSuitabilityScore, 10)
+    : null;
+  if (
+    Number.isFinite(settingsMinScore) &&
+    settingsMinScore != null &&
+    config.minSuitabilityScore == null
+  ) {
+    settingsDefaults.minSuitabilityScore = settingsMinScore;
+  }
+
+  const mergedConfig = {
+    ...DEFAULT_CONFIG,
+    ...settingsDefaults,
+    ...config,
+    locationIntent,
+  };
   const configSnapshot = {
     topN: mergedConfig.topN,
     minSuitabilityScore: mergedConfig.minSuitabilityScore,
@@ -583,6 +647,7 @@ export async function runPipeline(
       };
     } finally {
       tenantState.isRunning = false;
+      tenantState.startedAt = null;
       tenantState.activePipelineRunId = null;
       tenantState.cancelRequestedAt = null;
       tenantState.activeChallengeState = null;

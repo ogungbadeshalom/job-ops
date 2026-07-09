@@ -76,6 +76,12 @@ export const AdminWorkersPage: React.FC = () => {
 
   useQueryErrorToast(error, "Failed to load users");
 
+  // Only show admin and worker users — client logins are managed via the
+  // Clients page, not here.
+  const workers = users.filter(
+    (u) => u.isSystemAdmin || u.role === "worker" || u.role === "owner",
+  );
+
   const handleCreateUser = () => {
     if (!username.trim() || password.length < 8) return;
     createUserMutation.mutate({
@@ -175,13 +181,13 @@ export const AdminWorkersPage: React.FC = () => {
         </div>
       )}
 
-      {!isLoading && users.length === 0 && (
+      {!isLoading && workers.length === 0 && (
         <div className="py-12 text-center text-sm text-muted-foreground">
-          No users found.
+          No workers found.
         </div>
       )}
 
-      {!isLoading && users.length > 0 && (
+      {!isLoading && workers.length > 0 && (
         <div className="rounded-md border border-border">
           <Table>
             <TableHeader>
@@ -194,7 +200,7 @@ export const AdminWorkersPage: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {workers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
                     {user.displayName || user.username}
@@ -207,7 +213,9 @@ export const AdminWorkersPage: React.FC = () => {
                       {user.isSystemAdmin ? (
                         <Badge variant="secondary">Admin</Badge>
                       ) : (
-                        <Badge variant="outline">Worker</Badge>
+                        <Badge variant="outline">
+                          {user.role === "owner" ? "Owner" : "Worker"}
+                        </Badge>
                       )}
                     </div>
                   </TableCell>

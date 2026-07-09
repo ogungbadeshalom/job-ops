@@ -1,9 +1,12 @@
 import { isAwaitingAiScore } from "@client/components";
+import { isAdminFromToken } from "@client/lib/jwt";
 import type { JobListItem } from "@shared/types.js";
 import { Loader2, XCircle } from "lucide-react";
+import { useMemo } from "react";
 import { Tip } from "@/client/components/Tip";
 import { isPdfRegenerating, isPdfStale } from "@/client/lib/pdf-freshness";
 import { cn } from "@/lib/utils";
+import { useClientNameMap } from "./ClientNameContext";
 import { defaultStatusToken, statusTokens } from "./constants";
 
 interface JobRowContentProps {
@@ -35,6 +38,11 @@ export const JobRowContent = ({
   const suitabilityTone = getSuitabilityScoreTone(job.suitabilityScore ?? 0);
   const showStalePdf = isPdfStale(job);
   const showRegeneratingPdf = isPdfRegenerating(job);
+  const clientNameMap = useClientNameMap();
+  const clientName =
+    isAdminFromToken() && job.clientId && clientNameMap
+      ? clientNameMap.get(job.clientId)
+      : undefined;
 
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-3", className)}>
@@ -62,6 +70,11 @@ export const JobRowContent = ({
           {job.employer}
           {job.location && (
             <span className="before:content-['_in_']">{job.location}</span>
+          )}
+          {clientName && (
+            <span className="ml-1.5 inline-flex shrink-0 items-center rounded border border-violet-500/30 bg-violet-500/10 px-1 py-0 text-[9px] font-semibold leading-none text-violet-200">
+              {clientName}
+            </span>
           )}
         </div>
         {(job.salary?.trim() || showRegeneratingPdf || showStalePdf) && (

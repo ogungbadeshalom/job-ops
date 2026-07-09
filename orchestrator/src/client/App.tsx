@@ -69,7 +69,6 @@ import { MyJobsPage } from "./pages/client/MyJobsPage";
 import { DesignResumePage } from "./pages/DesignResumePage";
 import { GmailOauthCallbackPage } from "./pages/GmailOauthCallbackPage";
 import { HomePage } from "./pages/HomePage";
-import { InProgressBoardPage } from "./pages/InProgressBoardPage";
 import { JobPage } from "./pages/JobPage";
 import { OfflinePage } from "./pages/OfflinePage";
 import { OnboardingPage } from "./pages/OnboardingPage";
@@ -91,10 +90,11 @@ const REDIRECTS: Array<{ from: string; to: string }> = [
   { from: "/discovered/:jobId", to: "/jobs/discovered/:jobId" },
   { from: "/applied", to: "/jobs/applied" },
   { from: "/applied/:jobId", to: "/jobs/applied/:jobId" },
-  { from: "/in-progress", to: "/applications/in-progress" },
-  { from: "/in-progress/:jobId", to: "/applications/in-progress" },
-  { from: "/jobs/in_progress", to: "/applications/in-progress" },
-  { from: "/jobs/in_progress/:jobId", to: "/applications/in-progress" },
+  { from: "/in-progress", to: "/jobs/ready" },
+  { from: "/in-progress/:jobId", to: "/jobs/ready" },
+  { from: "/jobs/in_progress", to: "/jobs/ready" },
+  { from: "/jobs/in_progress/:jobId", to: "/jobs/ready" },
+  { from: "/applications/in-progress", to: "/jobs/ready" },
   { from: "/all", to: "/jobs/all" },
   { from: "/all/:jobId", to: "/jobs/all/:jobId" },
 ];
@@ -107,6 +107,10 @@ export const App: React.FC = () => {
   const navigate = useNavigate();
   const nodeRef = useRef<HTMLDivElement>(null);
   const isSignInPage = location.pathname === "/sign-in";
+  const isChromeless =
+    isSignInPage ||
+    location.pathname === "/onboarding" ||
+    location.pathname === "/offline";
   const demoInfo = useDemoInfo({ enabled: !isSignInPage });
   const showDemoBanners = !isSignInPage && demoInfo?.demoMode;
   const [demoWaitlistBannerDismissed, setDemoWaitlistBannerDismissed] =
@@ -146,6 +150,144 @@ export const App: React.FC = () => {
       setAuthNavigator(null);
     };
   }, [navigate]);
+
+  const routes = (
+    <AppErrorBoundary>
+      <Routes location={location}>
+        {/* Backwards-compatibility redirects */}
+        {REDIRECTS.map(({ from, to }) => (
+          <Route
+            key={from}
+            path={from}
+            element={<Navigate to={to} replace />}
+          />
+        ))}
+
+        {/* Application routes */}
+        <Route path="/overview" element={<HomePage />} />
+        <Route
+          path="/oauth/gmail/callback"
+          element={<GmailOauthCallbackPage />}
+        />
+        <Route path="/job/:id" element={<JobPage />} />
+        <Route path="/job/:id/:view" element={<JobPage />} />
+        <Route path="/design-resume" element={<DesignResumePage />} />
+        <Route
+          path="/design-resume/:section"
+          element={<DesignResumePage />}
+        />
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/offline" element={<OfflinePage />} />
+        <Route path="/sign-in" element={<SignInPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/tracer-links" element={<TracerLinksPage />} />
+        <Route path="/visa-sponsors" element={<VisaSponsorsPage />} />
+        <Route
+          path="/tracking-inbox"
+          element={
+            <AuthGuard requiredRole="admin">
+              <TrackingInboxPage />
+            </AuthGuard>
+          }
+        />
+        <Route path="/watchlist" element={<WatchlistPage />} />
+        <Route
+          path="/agency/clients"
+          element={
+            <AuthGuard>
+              <WorkerClientsPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/agency/clients/:id"
+          element={
+            <AuthGuard>
+              <WorkerClientDashboardPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AuthGuard requiredRole="admin">
+              <AdminOverviewPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/admin/clients"
+          element={
+            <AuthGuard requiredRole="admin">
+              <AdminClientsPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/admin/clients/new"
+          element={
+            <AuthGuard requiredRole="admin">
+              <AdminClientNewPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/admin/clients/:id"
+          element={
+            <AuthGuard requiredRole="admin">
+              <AdminClientEditPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/admin/workers"
+          element={
+            <AuthGuard requiredRole="admin">
+              <AdminWorkersPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/admin/work-log"
+          element={
+            <AuthGuard requiredRole="admin">
+              <AdminWorkLogPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/my-jobs"
+          element={
+            <AuthGuard requiredRole="client">
+              <MyJobsPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/my-jobs/:id"
+          element={
+            <AuthGuard requiredRole="client">
+              <MyJobDetailPage />
+            </AuthGuard>
+          }
+        />
+        <Route path="/jobs/:tab" element={<OrchestratorPage />} />
+        <Route path="/jobs/:tab/:jobId" element={<OrchestratorPage />} />
+      </Routes>
+    </AppErrorBoundary>
+  );
+
+  // Chromeless routes (sign-in, onboarding, offline) render full-screen
+  // without the sidebar, mobile toggle, or left margin so they center correctly.
+  if (isChromeless) {
+    return (
+      <SidebarProvider>
+        <OnboardingGate />
+        {routes}
+        <Toaster position="bottom-right" richColors closeButton />
+      </SidebarProvider>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -211,144 +353,7 @@ export const App: React.FC = () => {
               classNames="page"
               unmountOnExit
             >
-              <div ref={nodeRef}>
-                <AppErrorBoundary>
-                  <Routes location={location}>
-                    {/* Backwards-compatibility redirects */}
-                    {REDIRECTS.map(({ from, to }) => (
-                      <Route
-                        key={from}
-                        path={from}
-                        element={<Navigate to={to} replace />}
-                      />
-                    ))}
-
-                    {/* Application routes */}
-                    <Route path="/overview" element={<HomePage />} />
-                    <Route
-                      path="/oauth/gmail/callback"
-                      element={<GmailOauthCallbackPage />}
-                    />
-                    <Route path="/job/:id" element={<JobPage />} />
-                    <Route path="/job/:id/:view" element={<JobPage />} />
-                    <Route
-                      path="/applications/in-progress"
-                      element={<InProgressBoardPage />}
-                    />
-                    <Route
-                      path="/design-resume"
-                      element={<DesignResumePage />}
-                    />
-                    <Route
-                      path="/design-resume/:section"
-                      element={<DesignResumePage />}
-                    />
-                    <Route path="/onboarding" element={<OnboardingPage />} />
-                    <Route path="/offline" element={<OfflinePage />} />
-                    <Route path="/sign-in" element={<SignInPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/tracer-links" element={<TracerLinksPage />} />
-                    <Route
-                      path="/visa-sponsors"
-                      element={<VisaSponsorsPage />}
-                    />
-                    <Route
-                      path="/tracking-inbox"
-                      element={
-                        <AuthGuard requiredRole="admin">
-                          <TrackingInboxPage />
-                        </AuthGuard>
-                      }
-                    />
-                    <Route path="/watchlist" element={<WatchlistPage />} />
-                    <Route
-                      path="/agency/clients"
-                      element={
-                        <AuthGuard>
-                          <WorkerClientsPage />
-                        </AuthGuard>
-                      }
-                    />
-                    <Route
-                      path="/agency/clients/:id"
-                      element={
-                        <AuthGuard>
-                          <WorkerClientDashboardPage />
-                        </AuthGuard>
-                      }
-                    />
-                    <Route
-                      path="/admin"
-                      element={
-                        <AuthGuard requiredRole="admin">
-                          <AdminOverviewPage />
-                        </AuthGuard>
-                      }
-                    />
-                    <Route
-                      path="/admin/clients"
-                      element={
-                        <AuthGuard requiredRole="admin">
-                          <AdminClientsPage />
-                        </AuthGuard>
-                      }
-                    />
-                    <Route
-                      path="/admin/clients/new"
-                      element={
-                        <AuthGuard requiredRole="admin">
-                          <AdminClientNewPage />
-                        </AuthGuard>
-                      }
-                    />
-                    <Route
-                      path="/admin/clients/:id"
-                      element={
-                        <AuthGuard requiredRole="admin">
-                          <AdminClientEditPage />
-                        </AuthGuard>
-                      }
-                    />
-                    <Route
-                      path="/admin/workers"
-                      element={
-                        <AuthGuard requiredRole="admin">
-                          <AdminWorkersPage />
-                        </AuthGuard>
-                      }
-                    />
-                    <Route
-                      path="/admin/work-log"
-                      element={
-                        <AuthGuard requiredRole="admin">
-                          <AdminWorkLogPage />
-                        </AuthGuard>
-                      }
-                    />
-                  <Route
-                    path="/my-jobs"
-                    element={
-                      <AuthGuard requiredRole="client">
-                        <MyJobsPage />
-                      </AuthGuard>
-                    }
-                  />
-                  <Route
-                    path="/my-jobs/:id"
-                    element={
-                      <AuthGuard requiredRole="client">
-                        <MyJobDetailPage />
-                      </AuthGuard>
-                    }
-                  />
-                    <Route path="/jobs/:tab" element={<OrchestratorPage />} />
-                    <Route
-                      path="/jobs/:tab/:jobId"
-                      element={<OrchestratorPage />}
-                    />
-                  </Routes>
-                </AppErrorBoundary>
-              </div>
+              <div ref={nodeRef}>{routes}</div>
             </CSSTransition>
           </SwitchTransition>
         </div>

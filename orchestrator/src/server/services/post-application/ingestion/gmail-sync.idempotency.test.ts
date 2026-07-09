@@ -196,6 +196,7 @@ describe("gmail sync auto-log idempotency", () => {
         relevanceLlmScore: 99,
         relevanceDecision: "relevant",
         matchedJobId: "job-1",
+        clientId: null,
         matchConfidence: 99,
         stageTarget: "assessment",
         messageType: "interview",
@@ -214,6 +215,7 @@ describe("gmail sync auto-log idempotency", () => {
         message: {
           id: "post-msg-1",
           matchedJobId: "job-1",
+          clientId: null,
           processingStatus: "auto_linked",
           stageTarget: "assessment",
           receivedAt: Date.now(),
@@ -226,6 +228,7 @@ describe("gmail sync auto-log idempotency", () => {
         message: {
           id: "post-msg-1",
           matchedJobId: "job-1",
+          clientId: null,
           processingStatus: "auto_linked",
           stageTarget: "assessment",
           receivedAt: Date.now(),

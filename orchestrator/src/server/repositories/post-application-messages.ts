@@ -19,7 +19,11 @@ import {
   privateDataScopeFilter,
 } from "../tenancy/private-scope";
 
-const { postApplicationIntegrations, postApplicationMessages } = schema;
+const {
+  postApplicationIntegrations,
+  postApplicationMessages,
+  jobs: jobsTable,
+} = schema;
 
 function messagesScopeFilter() {
   return privateDataScopeFilter(postApplicationMessages);
@@ -27,6 +31,18 @@ function messagesScopeFilter() {
 
 function integrationsScopeFilter() {
   return privateDataScopeFilter(postApplicationIntegrations);
+}
+
+async function resolveClientIdFromJob(
+  matchedJobId: string | null | undefined,
+): Promise<string | null> {
+  if (!matchedJobId) return null;
+  const [row] = await db
+    .select({ clientId: jobsTable.clientId })
+    .from(jobsTable)
+    .where(eq(jobsTable.id, matchedJobId))
+    .limit(1);
+  return row?.clientId ?? null;
 }
 
 type UpsertPostApplicationMessageInput = {
@@ -53,6 +69,7 @@ type UpsertPostApplicationMessageInput = {
   stageEventPayload?: Record<string, unknown> | null;
   processingStatus: PostApplicationProcessingStatus;
   matchedJobId?: string | null;
+  clientId?: string | null;
   decidedAt?: number | null;
   decidedBy?: string | null;
   errorCode?: string | null;
@@ -135,6 +152,7 @@ function mapRowToPostApplicationMessage(
     relevanceDecision:
       row.relevanceDecision as PostApplicationRelevanceDecision,
     matchedJobId: row.matchedJobId,
+    clientId: row.clientId,
     matchConfidence: row.matchConfidence,
     stageTarget,
     messageType: row.messageType as PostApplicationMessageType,
@@ -219,6 +237,8 @@ export async function upsertPostApplicationMessage(
   };
   const nowIso = new Date().toISOString();
   const scope = getPrivateDataScope();
+  const resolvedClientId =
+    input.clientId ?? (await resolveClientIdFromJob(input.matchedJobId));
   const existing =
     input.existingMessage ??
     (await getPostApplicationMessageByExternalId(
@@ -259,6 +279,7 @@ export async function upsertPostApplicationMessage(
         stageEventPayload,
         processingStatus: nextProcessingStatus,
         matchedJobId: input.matchedJobId ?? null,
+        clientId: resolvedClientId,
         decidedAt: input.decidedAt ?? null,
         decidedBy: input.decidedBy ?? null,
         errorCode: input.errorCode ?? null,
@@ -314,6 +335,7 @@ export async function upsertPostApplicationMessage(
     stageEventPayload,
     processingStatus: input.processingStatus,
     matchedJobId: input.matchedJobId ?? null,
+    clientId: resolvedClientId,
     decidedAt: input.decidedAt ?? null,
     decidedBy: input.decidedBy ?? null,
     errorCode: input.errorCode ?? null,

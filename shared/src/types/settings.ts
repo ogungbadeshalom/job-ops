@@ -254,6 +254,8 @@ export interface AppSettings {
   workplaceTypes: Resolved<Array<"remote" | "hybrid" | "onsite">>;
   blockedCompanyKeywords: Resolved<string[]>;
   scoringInstructions: Resolved<string>;
+  pipelineTopN: Resolved<number>;
+  pipelineMinSuitabilityScore: Resolved<number>;
   ghostwriterSystemPromptTemplate: Resolved<string>;
   ghostwriterStopSlopEnabled: Resolved<boolean>;
   tailoringPromptTemplate: Resolved<string>;

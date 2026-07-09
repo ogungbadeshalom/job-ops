@@ -70,6 +70,7 @@ describe.sequential("Post-Application Review Workflow API", () => {
       processingStatus: "pending_user",
       matchedJobId:
         input?.matchedJobId === undefined ? job.id : input.matchedJobId,
+      clientId: null,
     });
 
     return { message, jobId: job.id };

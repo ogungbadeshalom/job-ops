@@ -34,8 +34,11 @@ export const ScoringSettingsSection: React.FC<ScoringSettingsSectionProps> = ({
     missingSalaryPenalty,
     autoSkipScoreThreshold,
     blockedCompanyKeywords,
+    pipelineTopN,
+    pipelineMinSuitabilityScore,
   } = values;
-  const { control, watch, setValue } = useFormContext<UpdateSettingsInput>();
+  const { control, watch, setValue, register } =
+    useFormContext<UpdateSettingsInput>();
   const [blockedCompanyKeywordDraft, setBlockedCompanyKeywordDraft] =
     useState("");
 
@@ -195,6 +198,57 @@ export const ScoringSettingsSection: React.FC<ScoringSettingsSectionProps> = ({
               ? blockedCompanyKeywords.default.join(", ")
               : "None"}
           </div>
+        </div>
+
+        <Separator />
+
+        {/* Pipeline yield configuration */}
+        <div className="space-y-3">
+          <Controller
+            control={control}
+            name="pipelineTopN"
+            render={({ field }) => (
+              <SettingsInput
+                label="Jobs to process per run"
+                type="number"
+                disabled={isLoading || isSaving}
+                inputProps={{
+                  id: "pipeline-top-n",
+                  step: 1,
+                  min: 1,
+                  max: 200,
+                  value: field.value ?? "",
+                  onChange: field.onChange,
+                  onBlur: field.onBlur,
+                }}
+                helper="How many top-scored jobs the pipeline keeps per run (1–200)."
+                current={`Effective: ${pipelineTopN.effective} | Default: ${pipelineTopN.default}`}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="pipelineMinSuitabilityScore"
+            render={({ field }) => (
+              <SettingsInput
+                label="Minimum suitability score"
+                type="number"
+                disabled={isLoading || isSaving}
+                inputProps={{
+                  id: "pipeline-min-score",
+                  step: 1,
+                  min: 0,
+                  max: 100,
+                  value: field.value ?? "",
+                  onChange: field.onChange,
+                  onBlur: field.onBlur,
+                }}
+                helper="Jobs scoring below this are dropped (0–100). Lower = more results but lower quality."
+                current={`Effective: ${pipelineMinSuitabilityScore.effective} | Default: ${pipelineMinSuitabilityScore.default}`}
+              />
+            )}
+          />
         </div>
 
         <Separator />

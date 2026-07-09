@@ -89,9 +89,17 @@ export const manifest: ExtractorManifest = {
       };
     }
 
+    // Dedup against already-known jobs to avoid re-importing and re-scoring.
+    const existingUrls = context.getExistingJobUrls
+      ? new Set(await context.getExistingJobUrls())
+      : null;
+    const jobs = existingUrls
+      ? result.jobs.filter((job) => job.jobUrl && !existingUrls.has(job.jobUrl))
+      : result.jobs;
+
     return {
       success: true,
-      jobs: result.jobs,
+      jobs,
       sourceErrors: result.sourceErrors,
     };
   },

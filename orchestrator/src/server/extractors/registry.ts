@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { logger } from "@infra/logger";
 import { sanitizeUnknown } from "@infra/sanitize";
 import {
@@ -251,6 +254,11 @@ async function createRegistry(): Promise<ExtractorRegistry> {
     })),
   });
 
+  // JobSpy venv health check — warn (not error) if Python deps are missing.
+  if (manifests.has("jobspy")) {
+    checkJobSpyVenvHealth();
+  }
+
   return {
     manifests,
     manifestBySource,
@@ -298,4 +306,47 @@ export async function isSourceAvailable(
 ): Promise<boolean> {
   const current = await getExtractorRegistry();
   return current.manifestBySource.has(source);
+}
+
+/**
+ * Checks whether the JobSpy Python venv exists. If not, logs a structured
+ * warning so the admin knows LinkedIn/Indeed/Glassdoor searches will fail.
+ * Mirrors the Typst/Tectonic probe pattern.
+ */
+function checkJobSpyVenvHealth(): void {
+  // The jobspy extractor lives two levels up from the orchestrator server src.
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    resolve(process.cwd(), "..", "extractors", "jobspy"),
+    resolve(here, "..", "..", "..", "..", "extractors", "jobspy"),
+  ];
+
+  let extractorDir: string | null = null;
+  for (const candidate of candidates) {
+    if (existsSync(join(candidate, "manifest.ts"))) {
+      extractorDir = candidate;
+      break;
+    }
+  }
+
+  if (!extractorDir) {
+    // Can't locate the dir; skip the check silently.
+    return;
+  }
+
+  const venvPython = join(
+    extractorDir,
+    ".venv",
+    process.platform === "win32" ? "Scripts/python.exe" : "bin/python3",
+  );
+
+  if (!existsSync(venvPython)) {
+    logger.warn(
+      "JobSpy extractor is not available at runtime: Python venv not found. LinkedIn, Indeed, and Glassdoor searches will fail. Run: cd extractors/jobspy && python -m venv .venv && .venv/Scripts/pip install -r requirements.txt",
+      {
+        extractorId: "jobspy",
+        expectedVenv: venvPython,
+      },
+    );
+  }
 }

@@ -1790,6 +1790,13 @@ function ensureAgencyClientColumns(): void {
       column: "client_id",
       refAction: "CASCADE",
     },
+    {
+      table: "post_application_messages",
+      column: "client_id",
+      backfillParentCol: "matched_job_id",
+      parentTable: "jobs",
+      refAction: "SET NULL",
+    },
   ];
 
   for (const {

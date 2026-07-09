@@ -199,19 +199,24 @@ export function SignInPage() {
       : "Enter your JobOps username and password.";
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(120,119,198,0.08),_transparent_45%),linear-gradient(180deg,_rgba(15,23,42,0.02),_transparent_30%)] px-4 py-16">
-      <div className="mx-auto flex min-h-[70vh] max-w-md items-center">
-        <Card className="w-full border-border/60 bg-background/95 shadow-xl">
-          <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl tracking-tight">{title}</CardTitle>
+    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(120,119,198,0.08),_transparent_45%),linear-gradient(180deg,_rgba(15,23,42,0.02),_transparent_30%)] px-4 py-8">
+      <div className="w-full max-w-md">
+        <div className="mb-8 flex items-center justify-center gap-2">
+          <img src="/favicon.png" alt="" className="h-8 w-8 rounded-lg" />
+          <span className="text-lg font-bold tracking-tight">
+            Job<span>Ops</span>
+          </span>
+        </div>
+        <Card className="border-border/60 bg-background/95 shadow-xl">
+          <CardHeader className="space-y-1 pb-6">
+            <CardTitle className="text-xl tracking-tight">{title}</CardTitle>
             <CardDescription>{description}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
             {hostedSignupEnabled ? (
               <Tabs
                 value={authMode}
                 onValueChange={(value) => resetFormFeedback(value as AuthMode)}
-                className="mb-5"
               >
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger
@@ -230,7 +235,7 @@ export function SignInPage() {
               </Tabs>
             ) : null}
             {authMode === "sign-in" && rememberedUsers.length > 0 ? (
-              <div className="mb-5 space-y-2">
+              <div className="space-y-2">
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Remembered on this browser
                 </div>

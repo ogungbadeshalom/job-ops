@@ -338,6 +338,28 @@ export async function runJobSpy(
             },
           });
 
+          // Kill the child process if it exceeds the timeout. Without this,
+          // a hung HTTP request inside JobSpy blocks the entire pipeline.
+          const JOBSPY_PROCESS_TIMEOUT_MS =
+            Number.parseInt(
+              process.env.JOBSPY_PROCESS_TIMEOUT_MS ?? "",
+              10,
+            ) || 90_000;
+          const timeoutHandle = setTimeout(() => {
+            try {
+              child.kill("SIGTERM");
+              setTimeout(() => {
+                try {
+                  child.kill("SIGKILL");
+                } catch {
+                  // already dead
+                }
+              }, 5000);
+            } catch {
+              // already dead
+            }
+          }, JOBSPY_PROCESS_TIMEOUT_MS);
+
           const handleLine = (line: string, stream: NodeJS.WriteStream) => {
             const event = parseJobSpyProgressLine(line);
             if (event) {
@@ -363,12 +385,16 @@ export async function runJobSpy(
           stderrRl?.on("line", (line) => handleLine(line, process.stderr));
 
           child.on("close", (code) => {
+            clearTimeout(timeoutHandle);
             stdoutRl?.close();
             stderrRl?.close();
             if (code === 0) resolve();
             else reject(new Error(`JobSpy exited with code ${code}`));
           });
-          child.on("error", reject);
+          child.on("error", (err) => {
+            clearTimeout(timeoutHandle);
+            reject(err);
+          });
         });
 
         const raw = await readFile(outputJson, "utf-8");
@@ -386,6 +412,20 @@ export async function runJobSpy(
           await unlink(outputCsv);
         } catch {
           // ignore cleanup errors
+        }
+
+        // Inter-term delay to reduce rate-limiting / IP ban risk. Skipped on
+        // the very last iteration since nothing follows.
+        const isLastIteration = runIndex >= totalRuns;
+        if (!isLastIteration) {
+          const interTermDelayMs =
+            Number.parseInt(process.env.JOBSPY_INTER_TERM_DELAY_MS ?? "", 10) ||
+            2000;
+          if (interTermDelayMs > 0) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, interTermDelayMs),
+            );
+          }
         }
       }
     }

@@ -1,7 +1,9 @@
 import csv
 import json
 import os
+import random
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -88,6 +90,13 @@ def _glassdoor_city_for_country(country_indeed: str, location: str) -> str | Non
     return GLASSDOOR_COUNTRY_TO_CITY.get(country_key)
 
 
+def _resolve_proxies():
+    proxy_url = os.getenv("JOBSPY_PROXY_URL", "").strip()
+    if not proxy_url:
+        return None
+    return {"http": proxy_url, "https": proxy_url}
+
+
 def _scrape_for_sites(
     *,
     sites: list[str],
@@ -98,6 +107,7 @@ def _scrape_for_sites(
     country_indeed: str,
     linkedin_fetch_description: bool,
     is_remote: bool,
+    proxies: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     kwargs: dict[str, object] = {
         "site_name": sites,
@@ -111,6 +121,8 @@ def _scrape_for_sites(
         kwargs["country_indeed"] = country_indeed
     if location and location.strip():
         kwargs["location"] = location
+    if proxies:
+        kwargs["proxies"] = proxies
     return scrape_jobs(**kwargs)
 
 
@@ -134,37 +146,64 @@ def _append_site_frame(
     country_indeed: str,
     linkedin_fetch_description: bool,
     is_remote: bool,
+    max_retries: int = 3,
+    retry_base_delay: int = 5,
+    proxies: dict[str, str] | None = None,
 ) -> None:
-    try:
-        frames.append(
-            _scrape_for_sites(
-                sites=[site],
-                search_term=search_term,
-                location=location,
-                results_wanted=results_wanted,
-                hours_old=hours_old,
-                country_indeed=country_indeed,
-                linkedin_fetch_description=linkedin_fetch_description,
-                is_remote=is_remote,
+    for attempt in range(1, max_retries + 1):
+        try:
+            frames.append(
+                _scrape_for_sites(
+                    sites=[site],
+                    search_term=search_term,
+                    location=location,
+                    results_wanted=results_wanted,
+                    hours_old=hours_old,
+                    country_indeed=country_indeed,
+                    linkedin_fetch_description=linkedin_fetch_description,
+                    is_remote=is_remote,
+                    proxies=proxies,
+                )
             )
-        )
-    except Exception as error:
-        formatted_error = _format_source_error(error)
-        source_errors.append(f"{site}: {formatted_error}")
-        _emit_progress(
-            "source_error",
-            {
-                "source": site,
-                "searchTerm": search_term,
-                "error": formatted_error,
-            },
-        )
-        print(
-            f"jobspy: Source {site} failed; continuing with remaining sources. "
-            f"{formatted_error}",
-            file=sys.stderr,
-            flush=True,
-        )
+            return
+        except Exception as error:
+            if attempt >= max_retries:
+                formatted_error = _format_source_error(error)
+                source_errors.append(f"{site}: {formatted_error}")
+                _emit_progress(
+                    "source_error",
+                    {
+                        "source": site,
+                        "searchTerm": search_term,
+                        "error": formatted_error,
+                    },
+                )
+                print(
+                    f"jobspy: Source {site} failed after {max_retries} attempts; "
+                    f"continuing with remaining sources. {formatted_error}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return
+
+            delay = retry_base_delay * (2 ** (attempt - 1)) + random.uniform(0, 1)
+            _emit_progress(
+                "source_retry",
+                {
+                    "source": site,
+                    "searchTerm": search_term,
+                    "attempt": attempt,
+                    "maxRetries": max_retries,
+                    "nextDelay": round(delay, 1),
+                },
+            )
+            print(
+                f"jobspy: {site} attempt {attempt}/{max_retries} failed; "
+                f"retrying in {delay:.1f}s...",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
 
 
 def main() -> int:
@@ -177,10 +216,17 @@ def main() -> int:
     results_wanted = _env_int("JOBSPY_RESULTS_WANTED", 200)
     hours_old = _env_int("JOBSPY_HOURS_OLD", 72)
     country_indeed = _env_str("JOBSPY_COUNTRY_INDEED", "")
-    linkedin_fetch_description = _env_bool("JOBSPY_LINKEDIN_FETCH_DESCRIPTION", True)
+    # Lazy description fetching: auto-disable for large runs to avoid blocking
+    auto_fetch_desc = results_wanted <= 50
+    linkedin_fetch_description = _env_bool(
+        "JOBSPY_LINKEDIN_FETCH_DESCRIPTION", auto_fetch_desc
+    )
     is_remote = _env_bool("JOBSPY_IS_REMOTE", False)
     term_index = _env_int("JOBSPY_TERM_INDEX", 1)
     term_total = _env_int("JOBSPY_TERM_TOTAL", 1)
+    max_retries = _env_int("JOBSPY_MAX_RETRIES", 3)
+    retry_base_delay = _env_int("JOBSPY_RETRY_BASE_DELAY", 5)
+    proxies = _resolve_proxies()
 
     output_csv = Path(_env_str("JOBSPY_OUTPUT_CSV", "jobs.csv"))
     output_json = Path(
@@ -191,6 +237,10 @@ def main() -> int:
     output_json.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"jobspy: Search term: {search_term}")
+    if proxies:
+        print(f"jobspy: Using proxy: {proxies['http'].split('@')[-1]}")
+    if not linkedin_fetch_description:
+        print("jobspy: LinkedIn description fetching disabled (large run)")
     _emit_progress(
         "term_start",
         {
@@ -219,6 +269,9 @@ def main() -> int:
             country_indeed="",
             linkedin_fetch_description=linkedin_fetch_description,
             is_remote=is_remote,
+            max_retries=max_retries,
+            retry_base_delay=retry_base_delay,
+            proxies=proxies,
         )
 
     if "indeed" in sites:
@@ -233,6 +286,9 @@ def main() -> int:
             country_indeed=country_indeed,
             linkedin_fetch_description=linkedin_fetch_description,
             is_remote=is_remote,
+            max_retries=max_retries,
+            retry_base_delay=retry_base_delay,
+            proxies=proxies,
         )
 
     if "glassdoor" in sites:
@@ -261,6 +317,9 @@ def main() -> int:
             country_indeed=country_indeed,
             linkedin_fetch_description=linkedin_fetch_description,
             is_remote=is_remote,
+            max_retries=max_retries,
+            retry_base_delay=retry_base_delay,
+            proxies=proxies,
         )
 
     if source_errors and not frames:

@@ -252,6 +252,9 @@ export interface Job {
   appliedAt: string | null;
   createdAt: string;
   updatedAt: string;
+
+  // Agency
+  clientId?: string | null;
 }
 
 export type JobListItem = Pick<
@@ -284,6 +287,7 @@ export type JobListItem = Pick<
   | "readyAt"
   | "appliedAt"
   | "updatedAt"
+  | "clientId"
 >;
 
 export interface CreateJobInput {

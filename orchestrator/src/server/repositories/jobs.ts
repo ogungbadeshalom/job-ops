@@ -523,6 +523,7 @@ export async function listJobSummariesByIds(jobIds: string[]): Promise<
     id: string;
     title: string;
     employer: string;
+    clientId: string | null;
   }>
 > {
   if (jobIds.length === 0) return [];
@@ -532,6 +533,7 @@ export async function listJobSummariesByIds(jobIds: string[]): Promise<
       id: jobs.id,
       title: jobs.title,
       employer: jobs.employer,
+      clientId: jobs.clientId,
     })
     .from(jobs)
     .where(and(jobsScopeFilter(), inArray(jobs.id, jobIds)));

@@ -28,6 +28,7 @@ export type PublicUser = {
   displayName: string | null;
   isSystemAdmin: boolean;
   isDisabled: boolean;
+  role?: string | null;
   workspaceId: string;
   workspaceName: string;
   createdAt: string;
@@ -52,6 +53,7 @@ function mapUser(row: {
   displayName: string | null;
   isSystemAdmin: boolean;
   isDisabled: boolean;
+  role?: string | null;
   workspaceId: string;
   workspaceName: string;
   createdAt: string;
@@ -63,6 +65,7 @@ function mapUser(row: {
     displayName: row.displayName,
     isSystemAdmin: row.isSystemAdmin,
     isDisabled: row.isDisabled,
+    role: row.role,
     workspaceId: row.workspaceId,
     workspaceName: row.workspaceName,
     createdAt: row.createdAt,
@@ -108,6 +111,7 @@ export async function getUserById(id: string): Promise<PublicUser | null> {
       displayName: users.displayName,
       isSystemAdmin: users.isSystemAdmin,
       isDisabled: users.isDisabled,
+      role: tenantMemberships.role,
       workspaceId: tenantMemberships.tenantId,
       workspaceName: tenants.name,
       createdAt: users.createdAt,
@@ -130,6 +134,7 @@ export async function listUsers(): Promise<PublicUser[]> {
       displayName: users.displayName,
       isSystemAdmin: users.isSystemAdmin,
       isDisabled: users.isDisabled,
+      role: tenantMemberships.role,
       workspaceId: tenantMemberships.tenantId,
       workspaceName: tenants.name,
       createdAt: users.createdAt,

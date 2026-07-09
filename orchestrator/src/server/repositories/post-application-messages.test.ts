@@ -40,6 +40,7 @@ describe.sequential("post-application message upsert transition semantics", () =
       stageEventPayload: { note: "test" },
       processingStatus: args.processingStatus,
       matchedJobId: null,
+      clientId: null,
     });
   }
 

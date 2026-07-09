@@ -61,6 +61,7 @@ describe.sequential("Jobs email routes", () => {
       stageEventPayload: null,
       processingStatus: "auto_linked",
       matchedJobId: job.id,
+      clientId: null,
     });
 
     return { job, message };

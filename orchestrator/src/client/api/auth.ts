@@ -33,6 +33,7 @@ export type AuthUser = {
   displayName: string | null;
   isSystemAdmin: boolean;
   isDisabled: boolean;
+  role?: string | null;
   workspaceId: string;
   workspaceName: string;
   createdAt: string;

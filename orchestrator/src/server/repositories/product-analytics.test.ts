@@ -248,6 +248,7 @@ describe.sequential("product analytics repository", () => {
       messageType: "other",
       processingStatus: "auto_linked",
       matchedJobId: "job-1",
+      clientId: null,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });

@@ -6,6 +6,7 @@ import {
 } from "@infra/errors";
 import { trackServerProductEvent } from "@infra/product-analytics";
 import { db, schema } from "@server/db";
+import { getClientNamesByIds } from "@server/repositories/clients";
 import { getJobById, listJobSummariesByIds } from "@server/repositories/jobs";
 import {
   getPostApplicationMessageById,
@@ -48,14 +49,20 @@ function syncRunsScopeFilter() {
 function buildMatchedJobMap(
   items: PostApplicationMessage[],
   jobs: Awaited<ReturnType<typeof listJobSummariesByIds>>,
+  clientNames: Map<string, string>,
 ): PostApplicationInboxItem[] {
   const jobById = new Map(jobs.map((job) => [job.id, job]));
-  return items.map((message) => ({
-    message,
-    matchedJob: message.matchedJobId
+  return items.map((message) => {
+    const matchedJob = message.matchedJobId
       ? (jobById.get(message.matchedJobId) ?? null)
-      : null,
-  }));
+      : null;
+    const clientId = message.clientId ?? matchedJob?.clientId ?? null;
+    return {
+      message,
+      matchedJob,
+      clientName: clientId ? (clientNames.get(clientId) ?? null) : null,
+    };
+  });
 }
 
 export async function listPostApplicationInbox(args: {
@@ -75,7 +82,16 @@ export async function listPostApplicationInbox(args: {
     new Set(messages.map((message) => message.matchedJobId).filter(Boolean)),
   ) as string[];
   const jobs = await listJobSummariesByIds(jobIds);
-  return buildMatchedJobMap(messages, jobs);
+  const clientIds = Array.from(
+    new Set(
+      [
+        ...messages.map((m) => m.clientId),
+        ...jobs.map((j) => j.clientId),
+      ].filter(Boolean),
+    ),
+  ) as string[];
+  const clientNames = await getClientNamesByIds(clientIds);
+  return buildMatchedJobMap(messages, jobs, clientNames);
 }
 
 export async function approvePostApplicationInboxItem(args: {
@@ -447,6 +463,15 @@ export async function listPostApplicationRunMessages(args: {
     new Set(messages.map((message) => message.matchedJobId).filter(Boolean)),
   ) as string[];
   const jobs = await listJobSummariesByIds(jobIds);
+  const clientIds = Array.from(
+    new Set(
+      [
+        ...messages.map((m) => m.clientId),
+        ...jobs.map((j) => j.clientId),
+      ].filter(Boolean),
+    ),
+  ) as string[];
+  const clientNames = await getClientNamesByIds(clientIds);
 
-  return { run, items: buildMatchedJobMap(messages, jobs) };
+  return { run, items: buildMatchedJobMap(messages, jobs, clientNames) };
 }

@@ -108,6 +108,8 @@ const DEFAULT_FORM_VALUES: UpdateSettingsInput = {
   missingSalaryPenalty: null,
   autoSkipScoreThreshold: null,
   blockedCompanyKeywords: [],
+  pipelineTopN: null,
+  pipelineMinSuitabilityScore: null,
   ghostwriterSystemPromptTemplate: "",
   tailoringPromptTemplate: "",
   scoringPromptTemplate: "",
@@ -318,6 +320,8 @@ const SECTION_FIELD_MAP: Record<
     "missingSalaryPenalty",
     "autoSkipScoreThreshold",
     "blockedCompanyKeywords",
+    "pipelineTopN",
+    "pipelineMinSuitabilityScore",
   ],
   "reactive-resume": [
     "pdfRenderer",
@@ -437,6 +441,8 @@ const NULL_SETTINGS_PAYLOAD: UpdateSettingsInput = {
   missingSalaryPenalty: null,
   autoSkipScoreThreshold: null,
   blockedCompanyKeywords: null,
+  pipelineTopN: null,
+  pipelineMinSuitabilityScore: null,
   ghostwriterSystemPromptTemplate: null,
   tailoringPromptTemplate: null,
   scoringPromptTemplate: null,
@@ -505,6 +511,8 @@ const mapSettingsToForm = (data: AppSettings): UpdateSettingsInput => ({
   missingSalaryPenalty: data.missingSalaryPenalty.override,
   autoSkipScoreThreshold: data.autoSkipScoreThreshold.override,
   blockedCompanyKeywords: data.blockedCompanyKeywords.override ?? [],
+  pipelineTopN: data.pipelineTopN.override,
+  pipelineMinSuitabilityScore: data.pipelineMinSuitabilityScore.override,
   ghostwriterSystemPromptTemplate:
     data.ghostwriterSystemPromptTemplate.value ?? "",
   tailoringPromptTemplate: data.tailoringPromptTemplate.value ?? "",
@@ -741,6 +749,14 @@ const getDerivedSettings = (settings: AppSettings | null) => {
       blockedCompanyKeywords: {
         effective: settings?.blockedCompanyKeywords?.value ?? [],
         default: settings?.blockedCompanyKeywords?.default ?? [],
+      },
+      pipelineTopN: {
+        effective: settings?.pipelineTopN?.value ?? 50,
+        default: settings?.pipelineTopN?.default ?? 50,
+      },
+      pipelineMinSuitabilityScore: {
+        effective: settings?.pipelineMinSuitabilityScore?.value ?? 30,
+        default: settings?.pipelineMinSuitabilityScore?.default ?? 30,
       },
     },
     promptTemplates: {
@@ -1247,6 +1263,14 @@ export const SettingsPage: React.FC = () => {
             ? null
             : normalized;
         })(),
+        pipelineTopN: nullIfSame(
+          data.pipelineTopN,
+          scoring.pipelineTopN.default,
+        ),
+        pipelineMinSuitabilityScore: nullIfSame(
+          data.pipelineMinSuitabilityScore,
+          scoring.pipelineMinSuitabilityScore.default,
+        ),
         ghostwriterSystemPromptTemplate: nullIfSame(
           normalizeString(data.ghostwriterSystemPromptTemplate),
           promptTemplates.ghostwriterSystemPromptTemplate.default,

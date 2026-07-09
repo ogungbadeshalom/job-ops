@@ -62,6 +62,8 @@ export type ScoringValues = {
   missingSalaryPenalty: EffectiveDefault<number>;
   autoSkipScoreThreshold: EffectiveDefault<number | null>;
   blockedCompanyKeywords: EffectiveDefault<string[]>;
+  pipelineTopN: EffectiveDefault<number>;
+  pipelineMinSuitabilityScore: EffectiveDefault<number>;
 };
 
 export type PromptTemplatesValues = {

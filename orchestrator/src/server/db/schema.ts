@@ -1036,6 +1036,9 @@ export const postApplicationMessages = sqliteTable(
     matchedJobId: text("matched_job_id").references(() => jobs.id, {
       onDelete: "set null",
     }),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "set null",
+    }),
     decidedAt: integer("decided_at", { mode: "number" }),
     decidedBy: text("decided_by"),
     errorCode: text("error_code"),

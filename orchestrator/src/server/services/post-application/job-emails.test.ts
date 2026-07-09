@@ -73,6 +73,7 @@ describe.sequential("post-application job emails service", () => {
       stageEventPayload: null,
       processingStatus: input.processingStatus ?? "auto_linked",
       matchedJobId: input.jobId,
+      clientId: null,
     });
     return message;
   }

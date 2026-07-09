@@ -214,7 +214,7 @@ const pipelineSearchPresetConfigSchema = z.object({
   workplaceTypes: z.array(z.enum(WORKPLACE_TYPE_VALUES)).min(1).max(3),
   searchScope: z.enum(LOCATION_SEARCH_SCOPE_VALUES),
   matchStrictness: z.enum(LOCATION_MATCH_STRICTNESS_VALUES),
-  topN: z.number().int().min(1).max(50),
+  topN: z.number().int().min(1).max(200),
   minSuitabilityScore: z.number().int().min(0).max(100),
   runBudget: z.number().int().min(50).max(1000),
   scoringInstructions: z.string().trim().max(4000).optional().default(""),
@@ -439,7 +439,7 @@ pipelineRouter.get(
  * POST /api/pipeline/run - Trigger the pipeline manually
  */
 const runPipelineSchema = z.object({
-  topN: z.number().min(1).max(50).optional(),
+  topN: z.number().min(1).max(200).optional(),
   minSuitabilityScore: z.number().min(0).max(100).optional(),
   sources: z.array(pipelineSourceSchema).min(1).optional(),
   runBudget: z.number().min(50).max(1000).optional(),

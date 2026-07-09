@@ -126,6 +126,7 @@ export interface PostApplicationMessage {
   relevanceLlmScore: number | null;
   relevanceDecision: PostApplicationRelevanceDecision;
   matchedJobId: string | null;
+  clientId: string | null;
   matchConfidence: number | null;
   stageTarget: PostApplicationRouterStageTarget | null;
   messageType: PostApplicationMessageType;
@@ -172,6 +173,7 @@ export interface PostApplicationInboxItem {
     title: string;
     employer: string;
   } | null;
+  clientName?: string | null;
 }
 
 export interface PostApplicationJobEmailItem {

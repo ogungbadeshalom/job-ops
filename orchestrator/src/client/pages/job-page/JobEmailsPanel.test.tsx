@@ -38,6 +38,7 @@ const makeMessage = (
   relevanceLlmScore: 95,
   relevanceDecision: "relevant",
   matchedJobId: "job-1",
+  clientId: null,
   matchConfidence: 95,
   stageTarget: "technical_interview",
   messageType: "interview",

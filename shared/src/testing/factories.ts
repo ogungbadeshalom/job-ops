@@ -197,6 +197,8 @@ export const createAppSettings = (
     default: "",
     override: null,
   },
+  pipelineTopN: { value: 50, default: 50, override: null },
+  pipelineMinSuitabilityScore: { value: 30, default: 30, override: null },
   ghostwriterSystemPromptTemplate: {
     value: getDefaultPromptTemplate("ghostwriterSystemPromptTemplate"),
     default: getDefaultPromptTemplate("ghostwriterSystemPromptTemplate"),
@@ -232,7 +234,7 @@ export const createAppSettings = (
     default: "exact_only",
     override: null,
   },
-  jobspyResultsWanted: { value: 20, default: 20, override: null },
+  jobspyResultsWanted: { value: 100, default: 100, override: null },
   jobspyCountryIndeed: {
     value: "",
     default: "",
