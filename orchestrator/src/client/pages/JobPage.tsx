@@ -78,7 +78,6 @@ import {
 import { getDeleteEventDescription } from "./job/deleteEventDescription";
 import { JobTimeline } from "./job/Timeline";
 import { JobDocumentsPanel } from "./job-page/JobDocumentsPanel";
-import { JobEmailsPanel } from "./job-page/JobEmailsPanel";
 import { JobNotesCard } from "./job-page/JobNotesCard";
 import {
   type JobMemoryView,
@@ -92,7 +91,6 @@ const normalizeMemoryView = (view: string | undefined): JobMemoryView => {
   if (
     view === "documents" ||
     view === "timeline" ||
-    view === "emails" ||
     view === "ghostwriter"
   ) {
     return view;
@@ -288,9 +286,6 @@ export const JobPage: React.FC = () => {
       }),
       queryClient.invalidateQueries({ queryKey: queryKeys.jobs.tasks(id) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.jobs.notes(id) }),
-      queryClient.invalidateQueries({
-        queryKey: [...queryKeys.jobs.all, "emails", id] as const,
-      }),
     ]);
   }, [id, queryClient]);
 
@@ -855,8 +850,6 @@ export const JobPage: React.FC = () => {
                 </div>
               </section>
             )}
-
-            {activeMemoryView === "emails" && <JobEmailsPanel jobId={job.id} />}
 
             {activeMemoryView === "ghostwriter" && (
               <section className="">

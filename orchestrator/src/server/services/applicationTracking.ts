@@ -425,12 +425,6 @@ function classifyStageAnalyticsSource(
   if (metadata?.reasonCode === "job_page_manual_stage") {
     return "job_page";
   }
-  if (metadata?.reasonCode === "post_application_auto_linked") {
-    return "tracking_inbox_auto";
-  }
-  if (metadata?.reasonCode === "post_application_manual_linked") {
-    return "tracking_inbox_review";
-  }
   if (metadata?.actor === "system" && toStage === "applied") {
     return "mark_applied";
   }

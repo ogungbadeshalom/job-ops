@@ -13,10 +13,6 @@ import {
   normalizeGhostwriterSelectedDocumentIds,
 } from "@shared/ghostwriter-document-context.js";
 import {
-  GHOSTWRITER_EMAIL_CONTEXT_MAX_SELECTED,
-  normalizeGhostwriterSelectedEmailIds,
-} from "@shared/ghostwriter-email-context.js";
-import {
   GHOSTWRITER_NOTE_CONTEXT_MAX_SELECTED,
   normalizeGhostwriterSelectedNoteIds,
 } from "@shared/ghostwriter-note-context.js";
@@ -41,7 +37,6 @@ import {
 import { LlmService } from "./llm/service";
 import type { JsonSchemaDefinition } from "./llm/types";
 import { resolveLlmRuntimeSettings as resolveRuntimeLlmSettings } from "./modelSelection";
-import { listJobPostApplicationEmailsByIds } from "./post-application/job-emails";
 
 type LlmRuntimeSettings = {
   model: string;
@@ -479,23 +474,6 @@ async function validateSelectedNoteIdsForJob(
   });
 }
 
-async function validateSelectedEmailIdsForJob(
-  jobId: string,
-  selectedEmailIds: readonly string[],
-): Promise<string[]> {
-  return validateSelectedContextIdsForJob({
-    selectedIds: selectedEmailIds,
-    maxSelected: GHOSTWRITER_EMAIL_CONTEXT_MAX_SELECTED,
-    contextLabel: "email",
-    maxSelectedDetailsKey: "maxSelectedEmails",
-    invalidIdsDetailsKey: "invalidEmailIds",
-    normalize: normalizeGhostwriterSelectedEmailIds,
-    listItems: (normalizedEmailIds) =>
-      listJobPostApplicationEmailsByIds(jobId, normalizedEmailIds),
-    getId: (email) => email.message.id,
-  });
-}
-
 async function validateSelectedDocumentIdsForJob(
   jobId: string,
   selectedDocumentIds: readonly string[],
@@ -549,29 +527,23 @@ async function updateThreadContext(input: {
   jobId: string;
   threadId: string;
   selectedNoteIds?: readonly string[];
-  selectedEmailIds?: readonly string[];
   selectedDocumentIds?: readonly string[];
 }) {
-  const [selectedNoteIds, selectedEmailIds, selectedDocumentIds] =
-    await Promise.all([
-      input.selectedNoteIds === undefined
-        ? Promise.resolve(undefined)
-        : validateSelectedNoteIdsForJob(input.jobId, input.selectedNoteIds),
-      input.selectedEmailIds === undefined
-        ? Promise.resolve(undefined)
-        : validateSelectedEmailIdsForJob(input.jobId, input.selectedEmailIds),
-      input.selectedDocumentIds === undefined
-        ? Promise.resolve(undefined)
-        : validateSelectedDocumentIdsForJob(
-            input.jobId,
-            input.selectedDocumentIds,
-          ),
-    ]);
+  const [selectedNoteIds, selectedDocumentIds] = await Promise.all([
+    input.selectedNoteIds === undefined
+      ? Promise.resolve(undefined)
+      : validateSelectedNoteIdsForJob(input.jobId, input.selectedNoteIds),
+    input.selectedDocumentIds === undefined
+      ? Promise.resolve(undefined)
+      : validateSelectedDocumentIdsForJob(
+          input.jobId,
+          input.selectedDocumentIds,
+        ),
+  ]);
   const thread = await jobChatRepo.updateThreadContext({
     jobId: input.jobId,
     threadId: input.threadId,
     selectedNoteIds,
-    selectedEmailIds,
     selectedDocumentIds,
   });
 
@@ -597,7 +569,6 @@ export async function listThreads(jobId: string) {
 export async function updateContextForJob(input: {
   jobId: string;
   selectedNoteIds?: readonly string[];
-  selectedEmailIds?: readonly string[];
   selectedDocumentIds?: readonly string[];
 }) {
   const thread = await ensureJobThread(input.jobId);
@@ -605,13 +576,11 @@ export async function updateContextForJob(input: {
     jobId: input.jobId,
     threadId: thread.id,
     selectedNoteIds: input.selectedNoteIds,
-    selectedEmailIds: input.selectedEmailIds,
     selectedDocumentIds: input.selectedDocumentIds,
   });
 
   return {
     selectedNoteIds: updatedThread.selectedNoteIds,
-    selectedEmailIds: updatedThread.selectedEmailIds,
     selectedDocumentIds: updatedThread.selectedDocumentIds,
   };
 }
@@ -659,7 +628,6 @@ export async function listMessagesForJob(input: {
   messages: JobChatMessage[];
   branches: BranchInfo[];
   selectedNoteIds: string[];
-  selectedEmailIds: string[];
   selectedDocumentIds: string[];
 }> {
   const thread = await ensureJobThread(input.jobId);
@@ -669,7 +637,6 @@ export async function listMessagesForJob(input: {
     messages,
     branches,
     selectedNoteIds: thread.selectedNoteIds,
-    selectedEmailIds: thread.selectedEmailIds,
     selectedDocumentIds: thread.selectedDocumentIds,
   };
 }
@@ -695,7 +662,6 @@ async function runAssistantReply(
     buildJobChatPromptContext(
       options.jobId,
       thread.selectedNoteIds,
-      thread.selectedEmailIds,
       thread.selectedDocumentIds,
     ),
     options.llmConfig ?? resolveLlmRuntimeSettings(),
@@ -782,14 +748,6 @@ async function runAssistantReply(
               {
                 role: "system" as const,
                 content: context.selectedNotesSnapshot,
-              },
-            ]
-          : []),
-        ...(context.selectedEmailsSnapshot
-          ? [
-              {
-                role: "system" as const,
-                content: context.selectedEmailsSnapshot,
               },
             ]
           : []),
@@ -957,7 +915,6 @@ export async function sendMessage(input: {
   content: string;
   attachments?: readonly JobChatImageAttachment[];
   selectedNoteIds?: readonly string[];
-  selectedEmailIds?: readonly string[];
   selectedDocumentIds?: readonly string[];
   stream?: GenerateReplyOptions["stream"];
 }) {
@@ -978,14 +935,12 @@ export async function sendMessage(input: {
   try {
     if (
       input.selectedNoteIds !== undefined ||
-      input.selectedEmailIds !== undefined ||
       input.selectedDocumentIds !== undefined
     ) {
       await updateThreadContext({
         jobId: input.jobId,
         threadId: input.threadId,
         selectedNoteIds: input.selectedNoteIds,
-        selectedEmailIds: input.selectedEmailIds,
         selectedDocumentIds: input.selectedDocumentIds,
       });
     }
@@ -1046,7 +1001,6 @@ export async function sendMessageForJob(input: {
   content: string;
   attachments?: readonly JobChatImageAttachment[];
   selectedNoteIds?: readonly string[];
-  selectedEmailIds?: readonly string[];
   selectedDocumentIds?: readonly string[];
   stream?: GenerateReplyOptions["stream"];
 }) {
@@ -1057,7 +1011,6 @@ export async function sendMessageForJob(input: {
     content: input.content,
     attachments: input.attachments,
     selectedNoteIds: input.selectedNoteIds,
-    selectedEmailIds: input.selectedEmailIds,
     selectedDocumentIds: input.selectedDocumentIds,
     stream: input.stream,
   });
@@ -1068,7 +1021,6 @@ export async function regenerateMessage(input: {
   threadId: string;
   assistantMessageId: string;
   selectedNoteIds?: readonly string[];
-  selectedEmailIds?: readonly string[];
   selectedDocumentIds?: readonly string[];
   stream?: GenerateReplyOptions["stream"];
 }) {
@@ -1125,14 +1077,12 @@ export async function regenerateMessage(input: {
   try {
     if (
       input.selectedNoteIds !== undefined ||
-      input.selectedEmailIds !== undefined ||
       input.selectedDocumentIds !== undefined
     ) {
       await updateThreadContext({
         jobId: input.jobId,
         threadId: input.threadId,
         selectedNoteIds: input.selectedNoteIds,
-        selectedEmailIds: input.selectedEmailIds,
         selectedDocumentIds: input.selectedDocumentIds,
       });
     }
@@ -1169,7 +1119,6 @@ export async function regenerateMessageForJob(input: {
   jobId: string;
   assistantMessageId: string;
   selectedNoteIds?: readonly string[];
-  selectedEmailIds?: readonly string[];
   selectedDocumentIds?: readonly string[];
   stream?: GenerateReplyOptions["stream"];
 }) {
@@ -1179,7 +1128,6 @@ export async function regenerateMessageForJob(input: {
     threadId: thread.id,
     assistantMessageId: input.assistantMessageId,
     selectedNoteIds: input.selectedNoteIds,
-    selectedEmailIds: input.selectedEmailIds,
     selectedDocumentIds: input.selectedDocumentIds,
     stream: input.stream,
   });
@@ -1192,7 +1140,6 @@ export async function editMessage(input: {
   content: string;
   attachments?: readonly JobChatImageAttachment[];
   selectedNoteIds?: readonly string[];
-  selectedEmailIds?: readonly string[];
   selectedDocumentIds?: readonly string[];
   stream?: GenerateReplyOptions["stream"];
 }) {
@@ -1226,14 +1173,12 @@ export async function editMessage(input: {
   try {
     if (
       input.selectedNoteIds !== undefined ||
-      input.selectedEmailIds !== undefined ||
       input.selectedDocumentIds !== undefined
     ) {
       await updateThreadContext({
         jobId: input.jobId,
         threadId: input.threadId,
         selectedNoteIds: input.selectedNoteIds,
-        selectedEmailIds: input.selectedEmailIds,
         selectedDocumentIds: input.selectedDocumentIds,
       });
     }
@@ -1295,7 +1240,6 @@ export async function editMessageForJob(input: {
   content: string;
   attachments?: readonly JobChatImageAttachment[];
   selectedNoteIds?: readonly string[];
-  selectedEmailIds?: readonly string[];
   selectedDocumentIds?: readonly string[];
   stream?: GenerateReplyOptions["stream"];
 }) {
@@ -1307,7 +1251,6 @@ export async function editMessageForJob(input: {
     content: input.content,
     attachments: input.attachments,
     selectedNoteIds: input.selectedNoteIds,
-    selectedEmailIds: input.selectedEmailIds,
     selectedDocumentIds: input.selectedDocumentIds,
     stream: input.stream,
   });

@@ -4,11 +4,6 @@ import {
   GHOSTWRITER_DOCUMENT_CONTEXT_MAX_TOTAL_CHARS,
 } from "@shared/ghostwriter-document-context.js";
 import {
-  GHOSTWRITER_EMAIL_CONTEXT_MAX_SELECTED,
-  GHOSTWRITER_EMAIL_CONTEXT_MAX_SNIPPET_CHARS,
-  GHOSTWRITER_EMAIL_CONTEXT_MAX_TOTAL_CHARS,
-} from "@shared/ghostwriter-email-context.js";
-import {
   GHOSTWRITER_NOTE_CONTEXT_MAX_NOTE_CHARS,
   GHOSTWRITER_NOTE_CONTEXT_MAX_SELECTED,
   GHOSTWRITER_NOTE_CONTEXT_MAX_TOTAL_CHARS,
@@ -16,9 +11,8 @@ import {
 import type {
   JobDocument,
   JobNote,
-  PostApplicationJobEmailItem,
 } from "@shared/types";
-import { ChevronDown, FileText, Info, Mail, Paperclip } from "lucide-react";
+import { ChevronDown, FileText, Info, Paperclip } from "lucide-react";
 import type React from "react";
 import {
   canUseJobDocumentForTextContext,
@@ -41,18 +35,14 @@ const tokenCountFormatter = new Intl.NumberFormat("en", {
 
 type GhostwriterContextSelectorProps = {
   notes: JobNote[];
-  emails: PostApplicationJobEmailItem[];
   documents: JobDocument[];
   selectedNoteIds: string[];
-  selectedEmailIds: string[];
   selectedDocumentIds: string[];
   disabled?: boolean;
   areNotesLoading?: boolean;
-  areEmailsLoading?: boolean;
   areDocumentsLoading?: boolean;
   isSaving?: boolean;
   onNotesChange: (selectedNoteIds: string[]) => void;
-  onEmailsChange: (selectedEmailIds: string[]) => void;
   onDocumentsChange: (selectedDocumentIds: string[]) => void;
 };
 
@@ -129,20 +119,6 @@ function estimateSelectedContextTokens<TItem>(input: {
       Math.min(selectedContentChars, input.maxTotalChars),
     ),
   };
-}
-
-function getSenderLabel(email: PostApplicationJobEmailItem): string {
-  const senderName = email.message.senderName?.trim();
-  if (senderName) return senderName;
-  const address = email.message.fromAddress.trim();
-  return address || "Unknown sender";
-}
-
-function getEmailMeta(email: PostApplicationJobEmailItem): string {
-  const receivedAt = email.message.receivedAt
-    ? formatDateTime(new Date(email.message.receivedAt).toISOString())
-    : null;
-  return `${getSenderLabel(email)}${receivedAt ? ` - ${receivedAt}` : ""}`;
 }
 
 function canUseDocumentForGhostwriter(document: JobDocument): boolean {
@@ -313,24 +289,18 @@ export const GhostwriterContextSelector: React.FC<
   GhostwriterContextSelectorProps
 > = ({
   notes,
-  emails,
   documents,
   selectedNoteIds,
-  selectedEmailIds,
   selectedDocumentIds,
   disabled,
   areNotesLoading,
-  areEmailsLoading,
   areDocumentsLoading,
   isSaving,
   onNotesChange,
-  onEmailsChange,
   onDocumentsChange,
 }) => {
   const selectedCount =
-    selectedNoteIds.length +
-    selectedEmailIds.length +
-    selectedDocumentIds.length;
+    selectedNoteIds.length + selectedDocumentIds.length;
   const estimatedContextTokens =
     estimateSelectedContextTokens({
       items: notes,
@@ -339,14 +309,6 @@ export const GhostwriterContextSelector: React.FC<
       maxTotalChars: GHOSTWRITER_NOTE_CONTEXT_MAX_TOTAL_CHARS,
       getId: (note) => note.id,
       getContentLength: (note) => note.content.trim().length,
-    }).estimatedTokens +
-    estimateSelectedContextTokens({
-      items: emails,
-      selectedIds: selectedEmailIds,
-      maxItemChars: GHOSTWRITER_EMAIL_CONTEXT_MAX_SNIPPET_CHARS,
-      maxTotalChars: GHOSTWRITER_EMAIL_CONTEXT_MAX_TOTAL_CHARS,
-      getId: (email) => email.message.id,
-      getContentLength: (email) => email.message.snippet.trim().length,
     }).estimatedTokens;
   const triggerLabel =
     selectedCount > 0 ? `${selectedCount} context` : "Context";
@@ -447,31 +409,6 @@ export const GhostwriterContextSelector: React.FC<
                 : "PDF or text-like files only"
             }
             onChange={onDocumentsChange}
-          />
-
-          <ContextGroup
-            title="Emails"
-            icon={Mail}
-            items={emails}
-            selectedIds={selectedEmailIds}
-            loadingLabel="Loading emails..."
-            emptyLabel="No linked emails yet."
-            limitLabel={`${GHOSTWRITER_EMAIL_CONTEXT_MAX_SELECTED} email limit`}
-            overflowLabel="Selected emails exceed the AI context budget; later snippets will be trimmed."
-            maxSelected={GHOSTWRITER_EMAIL_CONTEXT_MAX_SELECTED}
-            maxItemChars={GHOSTWRITER_EMAIL_CONTEXT_MAX_SNIPPET_CHARS}
-            maxTotalChars={GHOSTWRITER_EMAIL_CONTEXT_MAX_TOTAL_CHARS}
-            disabled={disabled}
-            isLoading={areEmailsLoading}
-            isSaving={isSaving}
-            getId={(email) => email.message.id}
-            getTitle={(email) => email.message.subject || "No subject"}
-            getMeta={getEmailMeta}
-            getContentLength={(email) => email.message.snippet.trim().length}
-            getCheckboxId={(email) =>
-              `ghostwriter-email-context-${email.message.id}`
-            }
-            onChange={onEmailsChange}
           />
         </div>
       </PopoverContent>

@@ -28,7 +28,6 @@ vi.mock("@server/services/ghostwriter", () => ({
       lastMessageAt: new Date().toISOString(),
       activeRootMessageId: null,
       selectedNoteIds: ["note-1"],
-      selectedEmailIds: ["email-1"],
       selectedDocumentIds: ["doc-1"],
     },
   ]),
@@ -42,7 +41,6 @@ vi.mock("@server/services/ghostwriter", () => ({
       lastMessageAt: null,
       activeRootMessageId: null,
       selectedNoteIds: [],
-      selectedEmailIds: [],
       selectedDocumentIds: [],
     }),
   ),
@@ -50,11 +48,9 @@ vi.mock("@server/services/ghostwriter", () => ({
     async (input: {
       jobId: string;
       selectedNoteIds?: string[];
-      selectedEmailIds?: string[];
       selectedDocumentIds?: string[];
     }) => ({
       selectedNoteIds: input.selectedNoteIds ?? [],
-      selectedEmailIds: input.selectedEmailIds ?? [],
       selectedDocumentIds: input.selectedDocumentIds ?? [],
     }),
   ),
@@ -70,7 +66,6 @@ vi.mock("@server/services/ghostwriter", () => ({
     ],
     branches: [],
     selectedNoteIds: ["note-1"],
-    selectedEmailIds: ["email-1"],
     selectedDocumentIds: ["doc-1"],
   })),
   listMessagesForJob: vi.fn(async () => ({
@@ -85,7 +80,6 @@ vi.mock("@server/services/ghostwriter", () => ({
     ],
     branches: [],
     selectedNoteIds: ["note-1"],
-    selectedEmailIds: ["email-1"],
     selectedDocumentIds: ["doc-1"],
   })),
   sendMessage: vi.fn(async () => ({
@@ -230,19 +224,6 @@ describe.sequential("Ghostwriter API", () => {
     expect(res.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(body.data.selectedNoteIds).toEqual(["note-1"]);
-  });
-
-  it("updates selected Ghostwriter emails", async () => {
-    const res = await fetch(`${baseUrl}/api/jobs/job-1/chat/context`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ selectedEmailIds: ["email-1"] }),
-    });
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
-    expect(body.data.selectedEmailIds).toEqual(["email-1"]);
   });
 
   it("updates selected Ghostwriter documents", async () => {

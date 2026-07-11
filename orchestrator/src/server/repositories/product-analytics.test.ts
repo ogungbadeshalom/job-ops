@@ -235,23 +235,6 @@ describe.sequential("product analytics repository", () => {
         outcome: "offer_accepted",
       },
     ]);
-    await db.insert(schema.postApplicationMessages).values({
-      id: "msg-1",
-      provider: "gmail",
-      accountKey: "default",
-      externalMessageId: "external-1",
-      fromAddress: "noreply@example.com",
-      subject: "Matched",
-      receivedAt: 1_704_067_200_000,
-      snippet: "",
-      relevanceDecision: "relevant",
-      messageType: "other",
-      processingStatus: "auto_linked",
-      matchedJobId: "job-1",
-      clientId: null,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-01T00:00:00.000Z",
-    });
     await db.insert(schema.tracerLinks).values({
       id: "tracer-1",
       token: "token-1",
@@ -294,7 +277,6 @@ describe.sequential("product analytics repository", () => {
       application_interview_stage_reached: 1,
       application_offer_detected: 1,
       application_accepted: 1,
-      tracking_email_matched: 1,
       tracer_human_click_recorded: 1,
     });
 

@@ -511,7 +511,6 @@ const migrations = [
     last_message_at TEXT,
     active_root_message_id TEXT,
     selected_note_ids TEXT NOT NULL DEFAULT '[]',
-    selected_email_ids TEXT NOT NULL DEFAULT '[]',
     selected_document_ids TEXT NOT NULL DEFAULT '[]',
     FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
@@ -614,84 +613,11 @@ const migrations = [
     FOREIGN KEY (application_id) REFERENCES jobs(id) ON DELETE CASCADE
   )`,
 
-  `CREATE TABLE IF NOT EXISTS post_application_integrations (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL DEFAULT 'tenant_default',
-    provider TEXT NOT NULL CHECK(provider IN ('gmail', 'imap')),
-    account_key TEXT NOT NULL DEFAULT 'default',
-    display_name TEXT,
-    status TEXT NOT NULL DEFAULT 'disconnected' CHECK(status IN ('disconnected', 'connected', 'error')),
-    credentials TEXT,
-    last_connected_at INTEGER,
-    last_synced_at INTEGER,
-    last_error TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(tenant_id, provider, account_key),
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
-  )`,
-
-  `CREATE TABLE IF NOT EXISTS post_application_sync_runs (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL DEFAULT 'tenant_default',
-    provider TEXT NOT NULL CHECK(provider IN ('gmail', 'imap')),
-    account_key TEXT NOT NULL DEFAULT 'default',
-    integration_id TEXT,
-    status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running', 'completed', 'failed', 'cancelled')),
-    started_at INTEGER NOT NULL,
-    completed_at INTEGER,
-    messages_discovered INTEGER NOT NULL DEFAULT 0,
-    messages_relevant INTEGER NOT NULL DEFAULT 0,
-    messages_classified INTEGER NOT NULL DEFAULT 0,
-    messages_matched INTEGER NOT NULL DEFAULT 0,
-    messages_approved INTEGER NOT NULL DEFAULT 0,
-    messages_denied INTEGER NOT NULL DEFAULT 0,
-    messages_errored INTEGER NOT NULL DEFAULT 0,
-    error_code TEXT,
-    error_message TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-    FOREIGN KEY (integration_id) REFERENCES post_application_integrations(id) ON DELETE SET NULL
-  )`,
-
-  `CREATE TABLE IF NOT EXISTS post_application_messages (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL DEFAULT 'tenant_default',
-    provider TEXT NOT NULL CHECK(provider IN ('gmail', 'imap')),
-    account_key TEXT NOT NULL DEFAULT 'default',
-    integration_id TEXT,
-    sync_run_id TEXT,
-    external_message_id TEXT NOT NULL,
-    external_thread_id TEXT,
-    from_address TEXT NOT NULL DEFAULT '',
-    from_domain TEXT,
-    sender_name TEXT,
-    subject TEXT NOT NULL DEFAULT '',
-    received_at INTEGER NOT NULL,
-    snippet TEXT NOT NULL DEFAULT '',
-    classification_label TEXT,
-    classification_confidence REAL,
-    classification_payload TEXT,
-    relevance_llm_score REAL,
-    relevance_decision TEXT NOT NULL DEFAULT 'needs_llm' CHECK(relevance_decision IN ('relevant', 'not_relevant', 'needs_llm')),
-    match_confidence INTEGER,
-    message_type TEXT NOT NULL DEFAULT 'other' CHECK(message_type IN ('interview', 'rejection', 'offer', 'update', 'other')),
-    stage_event_payload TEXT,
-    processing_status TEXT NOT NULL DEFAULT 'pending_user' CHECK(processing_status IN ('auto_linked', 'pending_user', 'manual_linked', 'ignored')),
-    matched_job_id TEXT,
-    decided_at INTEGER,
-    decided_by TEXT,
-    error_code TEXT,
-    error_message TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-    FOREIGN KEY (integration_id) REFERENCES post_application_integrations(id) ON DELETE SET NULL,
-    FOREIGN KEY (sync_run_id) REFERENCES post_application_sync_runs(id) ON DELETE SET NULL,
-    FOREIGN KEY (matched_job_id) REFERENCES jobs(id) ON DELETE SET NULL,
-    UNIQUE(tenant_id, provider, account_key, external_message_id)
-  )`,
+  // Post-application / email-tracking feature removed. Drop orphaned tables
+  // from existing databases (idempotent). Order respects FK dependencies.
+  `DROP TABLE IF EXISTS post_application_messages`,
+  `DROP TABLE IF EXISTS post_application_sync_runs`,
+  `DROP TABLE IF EXISTS post_application_integrations`,
 
   `CREATE TABLE IF NOT EXISTS tracer_links (
     id TEXT PRIMARY KEY,
@@ -798,31 +724,6 @@ const migrations = [
   `UPDATE jobs
    SET ready_at = COALESCE(ready_at, updated_at)
    WHERE status = 'ready' AND ready_at IS NULL`,
-
-  // Smart-router columns for existing databases.
-  `ALTER TABLE post_application_messages ADD COLUMN match_confidence INTEGER`,
-  `ALTER TABLE post_application_messages ADD COLUMN message_type TEXT NOT NULL DEFAULT 'other' CHECK(message_type IN ('interview', 'rejection', 'offer', 'update', 'other'))`,
-  `ALTER TABLE post_application_messages ADD COLUMN stage_event_payload TEXT`,
-  `ALTER TABLE post_application_messages ADD COLUMN processing_status TEXT NOT NULL DEFAULT 'pending_user' CHECK(processing_status IN ('auto_linked', 'pending_user', 'manual_linked', 'ignored'))`,
-  `UPDATE post_application_messages
-   SET match_confidence = CAST(round(COALESCE(relevance_llm_score, 0)) AS INTEGER)
-   WHERE match_confidence IS NULL`,
-  `UPDATE post_application_messages
-   SET message_type = CASE
-      WHEN lower(COALESCE(classification_label, '')) LIKE '%interview%' THEN 'interview'
-      WHEN lower(COALESCE(classification_label, '')) LIKE '%offer%' THEN 'offer'
-      WHEN lower(COALESCE(classification_label, '')) LIKE '%reject%' THEN 'rejection'
-      WHEN lower(COALESCE(classification_label, '')) IN ('false positive', 'did not apply - inbound request') THEN 'other'
-      ELSE 'update'
-   END`,
-  `UPDATE post_application_messages
-   SET processing_status = CASE
-      WHEN review_status = 'approved' THEN 'manual_linked'
-      WHEN review_status IN ('pending_review', 'no_reliable_match') THEN 'pending_user'
-      ELSE 'ignored'
-   END`,
-  `DROP TABLE IF EXISTS post_application_message_candidates`,
-  `DROP TABLE IF EXISTS post_application_message_links`,
 
   // Protect child tables (stage_events/tasks/interviews) during parent table rebuilds.
   // Without this, dropping/replacing `jobs` can cascade-delete historical stage data.
@@ -1015,8 +916,6 @@ const migrations = [
   `CREATE INDEX IF NOT EXISTS idx_tasks_application_id ON tasks(application_id)`,
   `CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date)`,
   `CREATE INDEX IF NOT EXISTS idx_interviews_application_id ON interviews(application_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_post_app_sync_runs_provider_account_started_at ON post_application_sync_runs(provider, account_key, started_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_post_app_messages_provider_account_processing_status ON post_application_messages(provider, account_key, processing_status)`,
   `CREATE INDEX IF NOT EXISTS idx_job_chat_threads_job_updated ON job_chat_threads(job_id, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_job_chat_messages_thread_created ON job_chat_messages(thread_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_job_chat_runs_thread_status ON job_chat_runs(thread_id, status)`,
@@ -1115,7 +1014,6 @@ const migrations = [
   `ALTER TABLE job_chat_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'`,
   `ALTER TABLE job_chat_threads ADD COLUMN active_root_message_id TEXT`,
   `ALTER TABLE job_chat_threads ADD COLUMN selected_note_ids TEXT NOT NULL DEFAULT '[]'`,
-  `ALTER TABLE job_chat_threads ADD COLUMN selected_email_ids TEXT NOT NULL DEFAULT '[]'`,
   `ALTER TABLE job_chat_threads ADD COLUMN selected_document_ids TEXT NOT NULL DEFAULT '[]'`,
   `ALTER TABLE pipeline_runs ADD COLUMN config_snapshot TEXT`,
   `ALTER TABLE analytics_install_state ADD COLUMN raw_event_replay_version INTEGER NOT NULL DEFAULT 0`,
@@ -1203,9 +1101,6 @@ for (const migration of migrations) {
           .includes("alter table pipeline_runs add column") ||
         migration
           .toLowerCase()
-          .includes("alter table post_application_messages add column") ||
-        migration
-          .toLowerCase()
           .includes("alter table stage_events add column") ||
         migration
           .toLowerCase()
@@ -1220,14 +1115,6 @@ for (const migration of migrations) {
 
     if (isDuplicateColumn) {
       logger.info("Migration skipped (column already exists)");
-      continue;
-    }
-
-    const isLegacyBackfillOnFreshSchema =
-      migration.toLowerCase().includes("update post_application_messages") &&
-      message.toLowerCase().includes("no such column");
-    if (isLegacyBackfillOnFreshSchema) {
-      logger.info("Migration skipped (legacy backfill not applicable)");
       continue;
     }
 
@@ -1258,9 +1145,6 @@ function ensureTenantColumns(): void {
     "design_resume_documents",
     "design_resume_assets",
     "job_documents",
-    "post_application_integrations",
-    "post_application_sync_runs",
-    "post_application_messages",
     "tracer_links",
     "tracer_click_events",
     "auth_sessions",
@@ -1291,9 +1175,6 @@ function ensurePrivateUserColumns(): void {
     "design_resume_documents",
     "design_resume_assets",
     "job_documents",
-    "post_application_integrations",
-    "post_application_sync_runs",
-    "post_application_messages",
     "tracer_links",
     "tracer_click_events",
   ]) {
@@ -1305,8 +1186,6 @@ function ensurePrivateUserColumns(): void {
     "pipeline_runs",
     "settings",
     "design_resume_documents",
-    "post_application_integrations",
-    "post_application_sync_runs",
   ]) {
     backfillUserFromTenantOwner(tableName);
   }
@@ -1357,22 +1236,6 @@ function ensurePrivateUserColumns(): void {
     parentColumnName: "id",
   });
   backfillUserFromTenantOwner("design_resume_assets");
-
-  for (const tableName of ["post_application_messages"]) {
-    backfillUserFromParent({
-      tableName,
-      parentTableName: "post_application_integrations",
-      localColumnName: "integration_id",
-      parentColumnName: "id",
-    });
-    backfillUserFromParent({
-      tableName,
-      parentTableName: "jobs",
-      localColumnName: "matched_job_id",
-      parentColumnName: "id",
-    });
-    backfillUserFromTenantOwner(tableName);
-  }
 
   backfillUserFromParent({
     tableName: "tracer_click_events",
@@ -1498,170 +1361,11 @@ function cleanupLeftoverNewTables(): void {
 }
 
 function rebuildPostApplicationPrivateTables(): void {
-  if (
-    !tableExists("post_application_integrations") ||
-    !tableExists("post_application_messages") ||
-    !tableExists("tracer_links")
-  ) {
-    return;
-  }
-
-  for (const tableName of [
-    "post_application_integrations",
-    "post_application_messages",
-    "tracer_links",
-  ]) {
-    if (
-      !tableHasColumn(tableName, "tenant_id") ||
-      !tableHasColumn(tableName, "user_id")
-    ) {
-      return;
-    }
-  }
-
+  // The post-application feature has been removed. The only remaining job of
+  // this once-rebuild routine is to drop any leftover `*_new` temp tables from
+  // interrupted rebuilds. tracer_links now gets tenant/user columns via the
+  // standard ensurePrivateUserColumns / ensureTenantColumns path.
   cleanupLeftoverNewTables();
-
-  sqlite.exec("PRAGMA foreign_keys = OFF");
-  try {
-    const rebuildIntegrations = sqlite.transaction(() => {
-      sqlite.exec(`
-        DROP TABLE IF EXISTS post_application_integrations_new;
-        CREATE TABLE post_application_integrations_new (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT NOT NULL DEFAULT 'tenant_default',
-          user_id TEXT,
-          provider TEXT NOT NULL CHECK(provider IN ('gmail', 'imap')),
-          account_key TEXT NOT NULL DEFAULT 'default',
-          display_name TEXT,
-          status TEXT NOT NULL DEFAULT 'disconnected' CHECK(status IN ('disconnected', 'connected', 'error')),
-          credentials TEXT,
-          last_connected_at INTEGER,
-          last_synced_at INTEGER,
-          last_error TEXT,
-          created_at TEXT NOT NULL DEFAULT (datetime('now')),
-          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-          UNIQUE(tenant_id, user_id, provider, account_key)
-        );
-        INSERT OR IGNORE INTO post_application_integrations_new (
-          id, tenant_id, user_id, provider, account_key, display_name, status,
-          credentials, last_connected_at, last_synced_at, last_error, created_at, updated_at
-        )
-        SELECT
-          id, tenant_id, user_id, provider, account_key, display_name, status,
-          credentials, last_connected_at, last_synced_at, last_error, created_at, updated_at
-        FROM post_application_integrations
-        ORDER BY created_at ASC, id ASC;
-        DROP TABLE post_application_integrations;
-        ALTER TABLE post_application_integrations_new RENAME TO post_application_integrations;
-      `);
-    });
-    rebuildIntegrations();
-
-    const rebuildMessages = sqlite.transaction(() => {
-      sqlite.exec(`
-        DROP TABLE IF EXISTS post_application_messages_new;
-        CREATE TABLE post_application_messages_new (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT NOT NULL DEFAULT 'tenant_default',
-          user_id TEXT,
-          provider TEXT NOT NULL CHECK(provider IN ('gmail', 'imap')),
-          account_key TEXT NOT NULL DEFAULT 'default',
-          integration_id TEXT,
-          sync_run_id TEXT,
-          external_message_id TEXT NOT NULL,
-          external_thread_id TEXT,
-          from_address TEXT NOT NULL DEFAULT '',
-          from_domain TEXT,
-          sender_name TEXT,
-          subject TEXT NOT NULL DEFAULT '',
-          received_at INTEGER NOT NULL,
-          snippet TEXT NOT NULL DEFAULT '',
-          classification_label TEXT,
-          classification_confidence REAL,
-          classification_payload TEXT,
-          relevance_llm_score REAL,
-          relevance_decision TEXT NOT NULL DEFAULT 'needs_llm' CHECK(relevance_decision IN ('relevant', 'not_relevant', 'needs_llm')),
-          match_confidence INTEGER,
-          message_type TEXT NOT NULL DEFAULT 'other' CHECK(message_type IN ('interview', 'rejection', 'offer', 'update', 'other')),
-          stage_event_payload TEXT,
-          processing_status TEXT NOT NULL DEFAULT 'pending_user' CHECK(processing_status IN ('auto_linked', 'pending_user', 'manual_linked', 'ignored')),
-          matched_job_id TEXT,
-          decided_at INTEGER,
-          decided_by TEXT,
-          error_code TEXT,
-          error_message TEXT,
-          created_at TEXT NOT NULL DEFAULT (datetime('now')),
-          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-          FOREIGN KEY (integration_id) REFERENCES post_application_integrations(id) ON DELETE SET NULL,
-          FOREIGN KEY (sync_run_id) REFERENCES post_application_sync_runs(id) ON DELETE SET NULL,
-          FOREIGN KEY (matched_job_id) REFERENCES jobs(id) ON DELETE SET NULL,
-          UNIQUE(tenant_id, user_id, provider, account_key, external_message_id)
-        );
-        INSERT OR IGNORE INTO post_application_messages_new (
-          id, tenant_id, user_id, provider, account_key, integration_id, sync_run_id,
-          external_message_id, external_thread_id, from_address, from_domain, sender_name,
-          subject, received_at, snippet, classification_label, classification_confidence,
-          classification_payload, relevance_llm_score, relevance_decision, match_confidence,
-          message_type, stage_event_payload, processing_status, matched_job_id, decided_at,
-          decided_by, error_code, error_message, created_at, updated_at
-        )
-        SELECT
-          id, tenant_id, user_id, provider, account_key, integration_id, sync_run_id,
-          external_message_id, external_thread_id, from_address, from_domain, sender_name,
-          subject, received_at, snippet, classification_label, classification_confidence,
-          classification_payload, relevance_llm_score, relevance_decision, match_confidence,
-          message_type, stage_event_payload, processing_status, matched_job_id, decided_at,
-          decided_by, error_code, error_message, created_at, updated_at
-        FROM post_application_messages
-        ORDER BY created_at ASC, id ASC;
-        DROP TABLE post_application_messages;
-        ALTER TABLE post_application_messages_new RENAME TO post_application_messages;
-      `);
-    });
-    rebuildMessages();
-
-    const rebuildTracerLinks = sqlite.transaction(() => {
-      sqlite.exec(`
-        DROP TABLE IF EXISTS tracer_links_new;
-        CREATE TABLE tracer_links_new (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT NOT NULL DEFAULT 'tenant_default',
-          user_id TEXT,
-          token TEXT NOT NULL UNIQUE,
-          job_id TEXT NOT NULL,
-          source_path TEXT NOT NULL,
-          source_label TEXT NOT NULL,
-          destination_url TEXT NOT NULL,
-          destination_url_hash TEXT NOT NULL,
-          is_active INTEGER NOT NULL DEFAULT 1,
-          created_at TEXT NOT NULL DEFAULT (datetime('now')),
-          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-          FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
-          UNIQUE(tenant_id, user_id, job_id, source_path, destination_url_hash)
-        );
-        INSERT OR IGNORE INTO tracer_links_new (
-          id, tenant_id, user_id, token, job_id, source_path, source_label,
-          destination_url, destination_url_hash, is_active, created_at, updated_at
-        )
-        SELECT
-          id, tenant_id, user_id, token, job_id, source_path, source_label,
-          destination_url, destination_url_hash, is_active, created_at, updated_at
-        FROM tracer_links
-        ORDER BY created_at ASC, id ASC;
-        DROP TABLE tracer_links;
-        ALTER TABLE tracer_links_new RENAME TO tracer_links;
-      `);
-    });
-    rebuildTracerLinks();
-  } finally {
-    sqlite.exec("PRAGMA foreign_keys = ON");
-  }
 }
 
 function ensureAgencyTables(): void {
@@ -1824,18 +1528,6 @@ function ensureAgencyClientColumns(): void {
       column: "client_id",
       refAction: "CASCADE",
     },
-    {
-      table: "post_application_integrations",
-      column: "client_id",
-      refAction: "CASCADE",
-    },
-    {
-      table: "post_application_messages",
-      column: "client_id",
-      backfillParentCol: "matched_job_id",
-      parentTable: "jobs",
-      refAction: "SET NULL",
-    },
   ];
 
   for (const {
@@ -1971,17 +1663,12 @@ sqlite.exec(
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_tenant_user_job_url_unique ON jobs(tenant_id, coalesce(user_id, ''), job_url)",
 );
 sqlite.exec("DROP INDEX IF EXISTS idx_jobs_tenant_status");
+// Post-application tables removed — drop their now-orphaned unique indexes.
 sqlite.exec(
   "DROP INDEX IF EXISTS idx_post_app_integrations_tenant_user_provider_account_unique",
 );
 sqlite.exec(
-  "CREATE UNIQUE INDEX IF NOT EXISTS idx_post_app_integrations_tenant_user_provider_account_unique ON post_application_integrations(tenant_id, coalesce(user_id, ''), provider, account_key)",
-);
-sqlite.exec(
   "DROP INDEX IF EXISTS idx_post_app_messages_tenant_user_provider_account_external_unique",
-);
-sqlite.exec(
-  "CREATE UNIQUE INDEX IF NOT EXISTS idx_post_app_messages_tenant_user_provider_account_external_unique ON post_application_messages(tenant_id, coalesce(user_id, ''), provider, account_key, external_message_id)",
 );
 sqlite.exec(
   "DROP INDEX IF EXISTS idx_tracer_links_tenant_user_job_source_destination_unique",

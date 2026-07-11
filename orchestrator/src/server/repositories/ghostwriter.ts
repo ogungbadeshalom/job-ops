@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { normalizeGhostwriterSelectedDocumentIds } from "@shared/ghostwriter-document-context.js";
-import { normalizeGhostwriterSelectedEmailIds } from "@shared/ghostwriter-email-context.js";
 import { normalizeGhostwriterSelectedNoteIds } from "@shared/ghostwriter-note-context.js";
 import type {
   JobChatImageAttachment,
@@ -50,10 +49,6 @@ function parseSelectedContextIds(
 
 function parseSelectedNoteIds(value: string | null): string[] {
   return parseSelectedContextIds(value, normalizeGhostwriterSelectedNoteIds);
-}
-
-function parseSelectedEmailIds(value: string | null): string[] {
-  return parseSelectedContextIds(value, normalizeGhostwriterSelectedEmailIds);
 }
 
 function parseSelectedDocumentIds(value: string | null): string[] {
@@ -110,7 +105,6 @@ function mapThread(row: typeof jobChatThreads.$inferSelect): JobChatThread {
     lastMessageAt: row.lastMessageAt,
     activeRootMessageId: row.activeRootMessageId,
     selectedNoteIds: parseSelectedNoteIds(row.selectedNoteIds),
-    selectedEmailIds: parseSelectedEmailIds(row.selectedEmailIds),
     selectedDocumentIds: parseSelectedDocumentIds(row.selectedDocumentIds),
   };
 }
@@ -224,7 +218,6 @@ export async function createThread(input: {
     updatedAt: now,
     lastMessageAt: null,
     selectedNoteIds: "[]",
-    selectedEmailIds: "[]",
     selectedDocumentIds: "[]",
   });
 
@@ -265,7 +258,6 @@ export async function updateThreadContext(input: {
   jobId: string;
   threadId: string;
   selectedNoteIds?: string[];
-  selectedEmailIds?: string[];
   selectedDocumentIds?: string[];
 }): Promise<JobChatThread | null> {
   const now = new Date().toISOString();
@@ -277,13 +269,6 @@ export async function updateThreadContext(input: {
         ? {
             selectedNoteIds: JSON.stringify(
               normalizeGhostwriterSelectedNoteIds(input.selectedNoteIds),
-            ),
-          }
-        : {}),
-      ...(input.selectedEmailIds !== undefined
-        ? {
-            selectedEmailIds: JSON.stringify(
-              normalizeGhostwriterSelectedEmailIds(input.selectedEmailIds),
             ),
           }
         : {}),

@@ -15,7 +15,6 @@ export * from "./types/extractors";
 export * from "./types/jobs";
 export * from "./types/location";
 export * from "./types/pipeline";
-export * from "./types/post-application";
 export * from "./types/settings";
 export * from "./types/usage";
 export * from "./types/visa-sponsors";

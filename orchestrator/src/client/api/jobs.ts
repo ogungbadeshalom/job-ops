@@ -12,7 +12,6 @@ import type {
   JobsListResponse,
   JobsRevisionResponse,
   JobTracerLinksResponse,
-  PostApplicationJobEmailsResponse,
   StageEvent,
   StageEventMetadata,
   StageTransitionTarget,
@@ -147,18 +146,6 @@ export async function getJobDocumentBlob(
     {
       cache: "no-store",
     },
-  );
-}
-
-export async function getJobEmails(
-  id: string,
-  options?: { limit?: number },
-): Promise<PostApplicationJobEmailsResponse> {
-  return fetchApi<PostApplicationJobEmailsResponse>(
-    withQuery(`/jobs/${id}/emails`, {
-      t: Date.now(),
-      limit: options?.limit,
-    }),
   );
 }
 

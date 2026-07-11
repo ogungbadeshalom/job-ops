@@ -9,13 +9,11 @@ import { fetchApi, streamSseEvents, withQuery } from "./core";
 
 type GhostwriterContextSelectionInput = {
   selectedNoteIds?: string[];
-  selectedEmailIds?: string[];
   selectedDocumentIds?: string[];
 };
 
 type GhostwriterContextSelectionResult = {
   selectedNoteIds: string[];
-  selectedEmailIds: string[];
   selectedDocumentIds: string[];
 };
 
@@ -148,7 +146,6 @@ export async function streamJobGhostwriterMessage(
     {
       content: input.content,
       selectedNoteIds: input.selectedNoteIds,
-      selectedEmailIds: input.selectedEmailIds,
       selectedDocumentIds: input.selectedDocumentIds,
       attachments: input.attachments,
       stream: true,
@@ -223,7 +220,6 @@ export async function streamRegenerateJobChatMessage(
     `/jobs/${jobId}/chat/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(assistantMessageId)}/regenerate`,
     {
       selectedNoteIds: input.selectedNoteIds,
-      selectedEmailIds: input.selectedEmailIds,
       selectedDocumentIds: input.selectedDocumentIds,
       stream: true,
     },
@@ -246,7 +242,6 @@ export async function streamRegenerateJobGhostwriterMessage(
     `/jobs/${jobId}/chat/messages/${encodeURIComponent(assistantMessageId)}/regenerate`,
     {
       selectedNoteIds: input.selectedNoteIds,
-      selectedEmailIds: input.selectedEmailIds,
       selectedDocumentIds: input.selectedDocumentIds,
       stream: true,
     },
@@ -273,7 +268,6 @@ export async function editJobGhostwriterMessage(
     {
       content: input.content,
       selectedNoteIds: input.selectedNoteIds,
-      selectedEmailIds: input.selectedEmailIds,
       selectedDocumentIds: input.selectedDocumentIds,
       attachments: input.attachments,
       stream: true,

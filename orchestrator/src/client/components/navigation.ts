@@ -3,7 +3,6 @@ import {
   Building2,
   ClipboardList,
   Home,
-  Inbox,
   LayoutDashboard,
   Settings,
   UserCog,
@@ -91,7 +90,6 @@ export function getNavLinks(): NavLink[] {
         icon: LayoutDashboard,
         activePaths: ["/jobs/ready", "/jobs/discovered", "/jobs/applied"],
       },
-      { to: "/tracking-inbox", label: "Tracking Inbox", icon: Inbox },
       { to: "/settings", label: settingsLabel, icon: Settings },
     ];
   }

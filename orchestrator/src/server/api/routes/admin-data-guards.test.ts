@@ -167,49 +167,4 @@ describe.sequential("Admin-data guards (audit HIGH #4 + #5)", () => {
       expect(res.status).toBe(403);
     });
   });
-
-  describe("Tracking-Inbox mutations are admin-only (audit HIGH #5)", () => {
-    async function setupWorkerRole(baseUrl: string) {
-      const { createPrivateWorkspaceUser } = await import(
-        "@server/repositories/users"
-      );
-      const user = await createPrivateWorkspaceUser({
-        username: `worker-inbox-${crypto.randomUUID().slice(0, 8)}`,
-        password: "worker-pass-x",
-        displayName: "Worker Inbox",
-        isSystemAdmin: false,
-        useDefaultTenant: true,
-        role: "worker",
-      });
-      return login(baseUrl, user.username, "worker-pass-x");
-    }
-
-    it("POST /api/post-application/inbox/:messageId/approve returns 403 for worker", async () => {
-      const workerToken = await setupWorkerRole(baseUrl);
-      const res = await fetch(
-        `${baseUrl}/api/post-application/inbox/any-id/approve`,
-        { method: "POST", headers: authHeaders(workerToken), body: "{}" },
-      );
-      expect(res.status).toBe(403);
-    });
-
-    it("POST /api/post-application/inbox/:messageId/deny returns 403 for worker", async () => {
-      const workerToken = await setupWorkerRole(baseUrl);
-      const res = await fetch(
-        `${baseUrl}/api/post-application/inbox/any-id/deny`,
-        { method: "POST", headers: authHeaders(workerToken), body: "{}" },
-      );
-      expect(res.status).toBe(403);
-    });
-
-    it("POST /api/post-application/inbox/actions returns 403 for worker", async () => {
-      const workerToken = await setupWorkerRole(baseUrl);
-      const res = await fetch(`${baseUrl}/api/post-application/inbox/actions`, {
-        method: "POST",
-        headers: authHeaders(workerToken),
-        body: "{}",
-      });
-      expect(res.status).toBe(403);
-    });
-  });
 });

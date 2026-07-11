@@ -1,4 +1,4 @@
-import type { JobStatus, PostApplicationProvider } from "@shared/types";
+import type { JobStatus } from "@shared/types";
 
 export const queryKeys = {
   app: {
@@ -59,8 +59,6 @@ export const queryKeys = {
     notes: (id: string) => [...queryKeys.jobs.all, "notes", id] as const,
     documents: (id: string) =>
       [...queryKeys.jobs.all, "documents", id] as const,
-    emails: (id: string, limit: number) =>
-      [...queryKeys.jobs.all, "emails", id, { limit }] as const,
   },
   pipeline: {
     all: ["pipeline"] as const,
@@ -95,45 +93,6 @@ export const queryKeys = {
         ...queryKeys.visaSponsors.all,
         "organization",
         { name, providerId: providerId ?? null },
-      ] as const,
-  },
-  postApplication: {
-    all: ["post-application"] as const,
-    providerStatus: (provider: PostApplicationProvider, accountKey: string) =>
-      [
-        ...queryKeys.postApplication.all,
-        "provider-status",
-        { provider, accountKey },
-      ] as const,
-    inbox: (
-      provider: PostApplicationProvider,
-      accountKey: string,
-      limit: number,
-    ) =>
-      [
-        ...queryKeys.postApplication.all,
-        "inbox",
-        { provider, accountKey, limit },
-      ] as const,
-    runs: (
-      provider: PostApplicationProvider,
-      accountKey: string,
-      limit: number,
-    ) =>
-      [
-        ...queryKeys.postApplication.all,
-        "runs",
-        { provider, accountKey, limit },
-      ] as const,
-    runMessages: (
-      runId: string,
-      provider: PostApplicationProvider,
-      accountKey: string,
-    ) =>
-      [
-        ...queryKeys.postApplication.all,
-        "run-messages",
-        { runId, provider, accountKey },
       ] as const,
   },
   backups: {

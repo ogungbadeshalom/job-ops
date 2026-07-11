@@ -28,10 +28,6 @@ vi.mock("../repositories/job-documents", () => ({
   listJobDocumentsByIds: vi.fn(),
 }));
 
-vi.mock("./post-application/job-emails", () => ({
-  listJobPostApplicationEmailsByIds: vi.fn(),
-}));
-
 vi.mock("../repositories/settings", () => ({
   getSetting: vi.fn(),
 }));
@@ -53,7 +49,6 @@ import pdfParse from "pdf-parse";
 import { listJobDocumentsByIds } from "../repositories/job-documents";
 import { getJobById, listJobNotesByIds } from "../repositories/jobs";
 import { getSetting } from "../repositories/settings";
-import { listJobPostApplicationEmailsByIds } from "./post-application/job-emails";
 import { getProfile } from "./profile";
 import { getWritingStyle } from "./writing-style";
 
@@ -101,7 +96,6 @@ describe("buildJobChatPromptContext", () => {
     vi.mocked(pdfParse).mockResolvedValue(
       makePdfParseResult("PDF context text"),
     );
-    vi.mocked(listJobPostApplicationEmailsByIds).mockResolvedValue([]);
     vi.mocked(getSetting).mockResolvedValue(null);
     vi.mocked(getWritingStyle).mockResolvedValue({
       tone: "professional",
@@ -366,108 +360,6 @@ describe("buildJobChatPromptContext", () => {
     expect(context.selectedNotesSnapshot).not.toContain("A".repeat(3501));
   });
 
-  it("builds selected job emails context with shared truncation limits", async () => {
-    const job = createJob({ id: "job-ctx-emails" });
-    vi.mocked(getJobById).mockResolvedValue(job);
-    vi.mocked(getProfile).mockResolvedValue({});
-    vi.mocked(listJobPostApplicationEmailsByIds).mockResolvedValue([
-      {
-        message: {
-          id: "email-2",
-          provider: "gmail",
-          accountKey: "default",
-          integrationId: null,
-          syncRunId: null,
-          externalMessageId: "gmail-2",
-          externalThreadId: "thread-2",
-          fromAddress: "skip@example.com",
-          fromDomain: "example.com",
-          senderName: "Skip",
-          subject: "Not selected",
-          receivedAt: 1_767_225_600_000,
-          snippet: "Skip me",
-          classificationLabel: null,
-          classificationConfidence: null,
-          classificationPayload: null,
-          relevanceLlmScore: null,
-          relevanceDecision: "relevant",
-          matchedJobId: job.id,
-          clientId: null,
-          matchConfidence: 80,
-          stageTarget: "no_change",
-          messageType: "other",
-          stageEventPayload: null,
-          processingStatus: "auto_linked",
-          decidedAt: null,
-          decidedBy: null,
-          errorCode: null,
-          errorMessage: null,
-          createdAt: "2026-01-01T00:00:00.000Z",
-          updatedAt: "2026-01-01T00:00:00.000Z",
-        },
-        accountDisplayName: "Work Gmail",
-        sourceUrl: null,
-      },
-      {
-        message: {
-          id: "email-1",
-          provider: "gmail",
-          accountKey: "default",
-          integrationId: null,
-          syncRunId: null,
-          externalMessageId: "gmail-1",
-          externalThreadId: "thread-1",
-          fromAddress: "recruiter@example.com",
-          fromDomain: "example.com",
-          senderName: "Recruiter",
-          subject: "Interview update",
-          receivedAt: 1_767_225_600_000,
-          snippet: "A".repeat(1300),
-          classificationLabel: null,
-          classificationConfidence: null,
-          classificationPayload: null,
-          relevanceLlmScore: null,
-          relevanceDecision: "relevant",
-          matchedJobId: job.id,
-          clientId: null,
-          matchConfidence: 91,
-          stageTarget: "recruiter_screen",
-          messageType: "interview",
-          stageEventPayload: null,
-          processingStatus: "auto_linked",
-          decidedAt: null,
-          decidedBy: null,
-          errorCode: null,
-          errorMessage: null,
-          createdAt: "2026-01-02T00:00:00.000Z",
-          updatedAt: "2026-01-02T00:00:00.000Z",
-        },
-        accountDisplayName: "Work Gmail",
-        sourceUrl: "https://mail.google.com/mail/u/0/#all/thread-1",
-      },
-    ]);
-
-    const context = await buildJobChatPromptContext(job.id, [], ["email-1"]);
-
-    expect(listJobPostApplicationEmailsByIds).toHaveBeenCalledWith(job.id, [
-      "email-1",
-    ]);
-    expect(context.selectedEmailsSnapshot).toContain("Selected Job Emails:");
-    expect(context.selectedEmailsSnapshot).toContain(
-      "Email 1: Interview update",
-    );
-    expect(context.selectedEmailsSnapshot).toContain("Sender: Recruiter");
-    expect(context.selectedEmailsSnapshot).toContain(
-      "Context note: snippet trimmed for AI context limits.",
-    );
-    expect(context.selectedEmailsSnapshot).not.toContain("Account:");
-    expect(context.selectedEmailsSnapshot).not.toContain("Source URL:");
-    expect(context.selectedEmailsSnapshot).not.toContain("Work Gmail");
-    expect(context.selectedEmailsSnapshot).not.toContain("mail.google.com");
-    expect(context.selectedEmailsSnapshot).not.toContain("Not selected");
-    expect(context.selectedEmailsSnapshot).not.toContain("A".repeat(1301));
-  });
-
   it("builds selected job documents context with shared truncation limits", async () => {
     const job = createJob({ id: "job-ctx-documents" });
     vi.mocked(getJobById).mockResolvedValue(job);
@@ -496,7 +388,7 @@ describe("buildJobChatPromptContext", () => {
     ]);
     mockDocumentFile(Buffer.from("A".repeat(7000)));
 
-    const context = await buildJobChatPromptContext(job.id, [], [], ["doc-1"]);
+    const context = await buildJobChatPromptContext(job.id, [], ["doc-1"]);
 
     expect(listJobDocumentsByIds).toHaveBeenCalledWith(job.id, ["doc-1"]);
     expect(mocks.open).toHaveBeenCalledWith("/tmp/take-home.md", "r");
@@ -548,7 +440,6 @@ describe("buildJobChatPromptContext", () => {
     const context = await buildJobChatPromptContext(
       job.id,
       [],
-      [],
       ["doc-docx"],
     );
 
@@ -585,7 +476,6 @@ describe("buildJobChatPromptContext", () => {
     const context = await buildJobChatPromptContext(
       job.id,
       [],
-      [],
       ["doc-pdf"],
     );
 
@@ -615,7 +505,7 @@ describe("buildJobChatPromptContext", () => {
     ]);
     const { read, close } = mockDocumentFile(Buffer.from("A".repeat(7000)));
 
-    await buildJobChatPromptContext(job.id, [], [], ["doc-large"]);
+    await buildJobChatPromptContext(job.id, [], ["doc-large"]);
 
     expect(mocks.open).toHaveBeenCalledWith("/tmp/large.txt", "r");
     expect(read).toHaveBeenCalledWith(

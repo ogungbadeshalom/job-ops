@@ -67,7 +67,6 @@ import { WorkerClientsPage } from "./pages/agency/WorkerClientsPage";
 import { MyJobDetailPage } from "./pages/client/MyJobDetailPage";
 import { MyJobsPage } from "./pages/client/MyJobsPage";
 import { DesignResumePage } from "./pages/DesignResumePage";
-import { GmailOauthCallbackPage } from "./pages/GmailOauthCallbackPage";
 import { HomePage } from "./pages/HomePage";
 import { JobPage } from "./pages/JobPage";
 import { OfflinePage } from "./pages/OfflinePage";
@@ -76,7 +75,6 @@ import { OrchestratorPage } from "./pages/OrchestratorPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { TracerLinksPage } from "./pages/TracerLinksPage";
-import { TrackingInboxPage } from "./pages/TrackingInboxPage";
 import { VisaSponsorsPage } from "./pages/VisaSponsorsPage";
 import { WatchlistPage } from "./pages/WatchlistPage";
 
@@ -165,10 +163,6 @@ export const App: React.FC = () => {
 
         {/* Application routes */}
         <Route path="/overview" element={<HomePage />} />
-        <Route
-          path="/oauth/gmail/callback"
-          element={<GmailOauthCallbackPage />}
-        />
         <Route path="/job/:id" element={<JobPage />} />
         <Route path="/job/:id/:view" element={<JobPage />} />
         <Route
@@ -204,14 +198,6 @@ export const App: React.FC = () => {
           element={
             <AuthGuard requiredRole="admin">
               <VisaSponsorsPage />
-            </AuthGuard>
-          }
-        />
-        <Route
-          path="/tracking-inbox"
-          element={
-            <AuthGuard requiredRole="admin">
-              <TrackingInboxPage />
             </AuthGuard>
           }
         />

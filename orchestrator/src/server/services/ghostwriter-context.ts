@@ -7,10 +7,6 @@ import {
   normalizeGhostwriterSelectedDocumentIds,
 } from "@shared/ghostwriter-document-context.js";
 import {
-  buildGhostwriterEmailContextItems,
-  normalizeGhostwriterSelectedEmailIds,
-} from "@shared/ghostwriter-email-context.js";
-import {
   buildGhostwriterNoteContextItems,
   normalizeGhostwriterSelectedNoteIds,
 } from "@shared/ghostwriter-note-context.js";
@@ -48,7 +44,6 @@ export type JobChatPromptContext = {
   jobSnapshot: string;
   profileSnapshot: string;
   selectedNotesSnapshot: string;
-  selectedEmailsSnapshot: string;
   selectedDocumentsSnapshot: string;
 };
 
@@ -200,47 +195,6 @@ async function buildSelectedNotesSnapshot(
   ]);
 }
 
-async function buildSelectedEmailsSnapshot(
-  jobId: string,
-  selectedEmailIds: readonly string[],
-): Promise<string> {
-  const { listJobPostApplicationEmailsByIds } = await import(
-    "./post-application/job-emails"
-  );
-  const selectedEmails = await listSelectedContextItems({
-    selectedIds: selectedEmailIds,
-    normalize: normalizeGhostwriterSelectedEmailIds,
-    listItems: (normalizedEmailIds) =>
-      listJobPostApplicationEmailsByIds(jobId, normalizedEmailIds),
-    getId: (email) => email.message.id,
-  });
-
-  if (selectedEmails.length === 0) return "";
-
-  const context = buildGhostwriterEmailContextItems(selectedEmails);
-  return compactJoin([
-    "Selected Job Emails:",
-    ...context.items.map((email, index) =>
-      compactJoin([
-        `Email ${index + 1}: ${email.subject}`,
-        `Sender: ${email.sender}`,
-        email.receivedAt
-          ? `Received: ${new Date(email.receivedAt).toISOString()}`
-          : null,
-        `Type: ${email.messageType}`,
-        `Status: ${email.processingStatus}`,
-        email.matchConfidence !== null
-          ? `Match confidence: ${email.matchConfidence}%`
-          : null,
-        email.wasTrimmed
-          ? "Context note: snippet trimmed for AI context limits."
-          : null,
-        email.snippet ? `Snippet:\n${email.snippet}` : "Snippet: [empty]",
-      ]),
-    ),
-  ]);
-}
-
 async function readFilePrefix(path: string, maxBytes: number): Promise<Buffer> {
   const file = await open(path, "r");
   try {
@@ -376,7 +330,6 @@ async function isStopSlopEnabled(): Promise<boolean> {
 export async function buildJobChatPromptContext(
   jobId: string,
   selectedNoteIds: readonly string[] = [],
-  selectedEmailIds: readonly string[] = [],
   selectedDocumentIds: readonly string[] = [],
 ): Promise<JobChatPromptContext> {
   const job = await jobsRepo.getJobById(jobId);
@@ -401,13 +354,11 @@ export async function buildJobChatPromptContext(
     baseSystemPrompt,
     stopSlopEnabled,
     selectedNotesSnapshot,
-    selectedEmailsSnapshot,
     selectedDocumentsSnapshot,
   ] = await Promise.all([
     buildSystemPrompt(style, profile, job.jobDescription),
     isStopSlopEnabled(),
     buildSelectedNotesSnapshot(jobId, selectedNoteIds),
-    buildSelectedEmailsSnapshot(jobId, selectedEmailIds),
     buildSelectedDocumentsSnapshot(jobId, selectedDocumentIds),
   ]);
   const systemPrompt = stopSlopEnabled
@@ -427,12 +378,9 @@ export async function buildJobChatPromptContext(
       jobChars: jobSnapshot.length,
       profileChars: profileSnapshot.length,
       selectedNotesChars: selectedNotesSnapshot.length,
-      selectedEmailsChars: selectedEmailsSnapshot.length,
       selectedDocumentsChars: selectedDocumentsSnapshot.length,
       selectedNoteCount:
         normalizeGhostwriterSelectedNoteIds(selectedNoteIds).length,
-      selectedEmailCount:
-        normalizeGhostwriterSelectedEmailIds(selectedEmailIds).length,
       selectedDocumentCount:
         normalizeGhostwriterSelectedDocumentIds(selectedDocumentIds).length,
     }),
@@ -445,7 +393,6 @@ export async function buildJobChatPromptContext(
     jobSnapshot,
     profileSnapshot,
     selectedNotesSnapshot,
-    selectedEmailsSnapshot,
     selectedDocumentsSnapshot,
   };
 }

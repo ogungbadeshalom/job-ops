@@ -52,14 +52,12 @@ export type StreamSseInput =
   | {
       content: string;
       selectedNoteIds?: string[];
-      selectedEmailIds?: string[];
       selectedDocumentIds?: string[];
       attachments?: import("@shared/types").JobChatImageAttachment[];
       stream: true;
     }
   | {
       selectedNoteIds?: string[];
-      selectedEmailIds?: string[];
       selectedDocumentIds?: string[];
       stream: true;
     };

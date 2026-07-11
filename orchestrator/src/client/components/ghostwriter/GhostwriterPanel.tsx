@@ -7,7 +7,6 @@ import type {
   JobChatStreamEvent,
   JobDocument,
   JobNote,
-  PostApplicationJobEmailItem,
 } from "@shared/types";
 import { Settings2 } from "lucide-react";
 import type React from "react";
@@ -31,8 +30,6 @@ import { Composer } from "./Composer";
 import { GhostwriterContextSelector } from "./GhostwriterContextSelector";
 import { MessageList } from "./MessageList";
 
-const JOB_EMAIL_LIMIT = 100;
-
 type GhostwriterPanelProps = {
   job: Job;
   initialPrompt?: string | null;
@@ -47,14 +44,11 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
   const [messages, setMessages] = useState<JobChatMessage[]>([]);
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [notes, setNotes] = useState<JobNote[]>([]);
-  const [emails, setEmails] = useState<PostApplicationJobEmailItem[]>([]);
   const [documents, setDocuments] = useState<JobDocument[]>([]);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
-  const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([]);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [areNotesLoading, setAreNotesLoading] = useState(true);
-  const [areEmailsLoading, setAreEmailsLoading] = useState(true);
   const [areDocumentsLoading, setAreDocumentsLoading] = useState(true);
   const [isSavingContext, setIsSavingContext] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -89,7 +83,6 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
     setMessages(data.messages);
     setBranches(data.branches);
     setSelectedNoteIds(data.selectedNoteIds);
-    setSelectedEmailIds(data.selectedEmailIds);
     setSelectedDocumentIds(data.selectedDocumentIds);
   }, [job.id]);
 
@@ -102,18 +95,6 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
       showErrorToast(error, "Failed to load notes");
     } finally {
       setAreNotesLoading(false);
-    }
-  }, [job.id]);
-
-  const loadEmails = useCallback(async () => {
-    setAreEmailsLoading(true);
-    try {
-      const data = await api.getJobEmails(job.id, { limit: JOB_EMAIL_LIMIT });
-      setEmails(data.items);
-    } catch (error) {
-      showErrorToast(error, "Failed to load emails");
-    } finally {
-      setAreEmailsLoading(false);
     }
   }, [job.id]);
 
@@ -132,18 +113,13 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      await Promise.all([
-        loadMessages(),
-        loadNotes(),
-        loadEmails(),
-        loadDocuments(),
-      ]);
+      await Promise.all([loadMessages(), loadNotes(), loadDocuments()]);
     } catch (error) {
       showErrorToast(error, "Failed to load Ghostwriter");
     } finally {
       setIsLoading(false);
     }
-  }, [loadDocuments, loadEmails, loadMessages, loadNotes]);
+  }, [loadDocuments, loadMessages, loadNotes]);
 
   useEffect(() => {
     void load();
@@ -284,7 +260,6 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
           {
             content,
             selectedNoteIds,
-            selectedEmailIds,
             selectedDocumentIds,
             attachments,
             signal: controller.signal,
@@ -310,7 +285,6 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
       loadMessages,
       messages,
       onStreamEvent,
-      selectedEmailIds,
       selectedDocumentIds,
       selectedNoteIds,
     ],
@@ -355,7 +329,6 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
           assistantMessageId,
           {
             selectedNoteIds,
-            selectedEmailIds,
             selectedDocumentIds,
             signal: controller.signal,
           },
@@ -377,7 +350,6 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
       job.id,
       loadMessages,
       onStreamEvent,
-      selectedEmailIds,
       selectedDocumentIds,
       selectedNoteIds,
     ],
@@ -431,7 +403,6 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
           {
             content,
             selectedNoteIds,
-            selectedEmailIds,
             selectedDocumentIds,
             attachments,
             signal: controller.signal,
@@ -454,7 +425,6 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
       job.id,
       loadMessages,
       onStreamEvent,
-      selectedEmailIds,
       selectedDocumentIds,
       selectedNoteIds,
     ],
@@ -463,19 +433,14 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
   const updateSelectedContext = useCallback(
     async (input: {
       selectedNoteIds?: string[];
-      selectedEmailIds?: string[];
       selectedDocumentIds?: string[];
       errorMessage: string;
     }) => {
       const previousSelectedNoteIds = selectedNoteIds;
-      const previousSelectedEmailIds = selectedEmailIds;
       const previousSelectedDocumentIds = selectedDocumentIds;
 
       if (input.selectedNoteIds !== undefined) {
         setSelectedNoteIds(input.selectedNoteIds);
-      }
-      if (input.selectedEmailIds !== undefined) {
-        setSelectedEmailIds(input.selectedEmailIds);
       }
       if (input.selectedDocumentIds !== undefined) {
         setSelectedDocumentIds(input.selectedDocumentIds);
@@ -486,22 +451,19 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
       try {
         const result = await api.updateJobGhostwriterContext(job.id, {
           selectedNoteIds: input.selectedNoteIds,
-          selectedEmailIds: input.selectedEmailIds,
           selectedDocumentIds: input.selectedDocumentIds,
         });
         setSelectedNoteIds(result.selectedNoteIds);
-        setSelectedEmailIds(result.selectedEmailIds);
         setSelectedDocumentIds(result.selectedDocumentIds);
       } catch (error) {
         setSelectedNoteIds(previousSelectedNoteIds);
-        setSelectedEmailIds(previousSelectedEmailIds);
         setSelectedDocumentIds(previousSelectedDocumentIds);
         showErrorToast(error, input.errorMessage);
       } finally {
         setIsSavingContext(false);
       }
     },
-    [job.id, selectedDocumentIds, selectedEmailIds, selectedNoteIds],
+    [job.id, selectedDocumentIds, selectedNoteIds],
   );
 
   const updateSelectedNotes = useCallback(
@@ -509,15 +471,6 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
       updateSelectedContext({
         selectedNoteIds: nextSelectedNoteIds,
         errorMessage: "Failed to update Ghostwriter notes",
-      }),
-    [updateSelectedContext],
-  );
-
-  const updateSelectedEmails = useCallback(
-    (nextSelectedEmailIds: string[]) =>
-      updateSelectedContext({
-        selectedEmailIds: nextSelectedEmailIds,
-        errorMessage: "Failed to update Ghostwriter emails",
       }),
     [updateSelectedContext],
   );
@@ -626,21 +579,15 @@ export const GhostwriterPanel: React.FC<GhostwriterPanelProps> = ({
           noteContextSelector={
             <GhostwriterContextSelector
               notes={notes}
-              emails={emails}
               documents={documents}
               selectedNoteIds={selectedNoteIds}
-              selectedEmailIds={selectedEmailIds}
               selectedDocumentIds={selectedDocumentIds}
               disabled={isLoading || isStreaming}
               areNotesLoading={areNotesLoading}
-              areEmailsLoading={areEmailsLoading}
               areDocumentsLoading={areDocumentsLoading}
               isSaving={isSavingContext}
               onNotesChange={(nextSelectedNoteIds) =>
                 void updateSelectedNotes(nextSelectedNoteIds)
-              }
-              onEmailsChange={(nextSelectedEmailIds) =>
-                void updateSelectedEmails(nextSelectedEmailIds)
               }
               onDocumentsChange={(nextSelectedDocumentIds) =>
                 void updateSelectedDocuments(nextSelectedDocumentIds)

@@ -17,8 +17,6 @@ const {
   designResumeDocuments,
   jobs,
   pipelineRuns,
-  postApplicationIntegrations,
-  postApplicationMessages,
   settings,
   stageEvents,
   tracerClickEvents,
@@ -80,7 +78,6 @@ const HISTORICAL_REPLAY_EVENT_RANK: Record<string, number> = {
   application_interview_stage_reached: 4,
   application_offer_detected: 5,
   application_accepted: 6,
-  tracking_email_matched: 7,
   tracer_human_click_recorded: 8,
 };
 
@@ -180,12 +177,6 @@ function classifyHistoricalStageAnalyticsSource(
   if (metadata?.reasonCode === "job_page_manual_stage") {
     return "job_page";
   }
-  if (metadata?.reasonCode === "post_application_auto_linked") {
-    return "tracking_inbox_auto";
-  }
-  if (metadata?.reasonCode === "post_application_manual_linked") {
-    return "tracking_inbox_review";
-  }
   if (metadata?.actor === "system" && toStage === "applied") {
     return "mark_applied";
   }
@@ -230,7 +221,6 @@ async function estimateInstallTimestampMs(): Promise<number> {
     earliestSettingCreatedAt,
     earliestAuthSessionCreatedAt,
     earliestResumeCreatedAt,
-    earliestIntegrationCreatedAt,
     earliestTracerLinkCreatedAt,
   ] = await Promise.all([
     db
@@ -256,14 +246,6 @@ async function estimateInstallTimestampMs(): Promise<number> {
       .from(designResumeDocuments)
       .where(analyticsPrivateDataFilter(designResumeDocuments)),
     db
-      .select({
-        value: sql<
-          string | null
-        >`min(${postApplicationIntegrations.createdAt})`,
-      })
-      .from(postApplicationIntegrations)
-      .where(analyticsPrivateDataFilter(postApplicationIntegrations)),
-    db
       .select({ value: sql<string | null>`min(${tracerLinks.createdAt})` })
       .from(tracerLinks)
       .where(analyticsPrivateDataFilter(tracerLinks)),
@@ -275,7 +257,6 @@ async function estimateInstallTimestampMs(): Promise<number> {
     earliestSettingCreatedAt[0]?.value ?? null,
     earliestAuthSessionCreatedAt[0]?.value ?? null,
     earliestResumeCreatedAt[0]?.value ?? null,
-    earliestIntegrationCreatedAt[0]?.value ?? null,
     earliestTracerLinkCreatedAt[0]?.value ?? null,
   ];
 
@@ -732,7 +713,7 @@ export async function getHistoricalServerEventReplayCandidates(args: {
 }): Promise<HistoricalServerEventReplayCandidate[]> {
   const cutoffSeconds = Math.floor(args.cutoffMs / 1000);
 
-  const [pipelineRunRows, stageEventRows, messageRows, tracerClickRows] =
+  const [pipelineRunRows, stageEventRows, tracerClickRows] =
     await Promise.all([
       db
         .select({
@@ -755,25 +736,6 @@ export async function getHistoricalServerEventReplayCandidates(args: {
           and(
             analyticsPrivateDataFilter(stageEvents),
             sql`${stageEvents.occurredAt} < ${cutoffSeconds}`,
-          ),
-        ),
-      db
-        .select({
-          id: postApplicationMessages.id,
-          provider: postApplicationMessages.provider,
-          processingStatus: postApplicationMessages.processingStatus,
-          receivedAt: postApplicationMessages.receivedAt,
-          decidedAt: postApplicationMessages.decidedAt,
-        })
-        .from(postApplicationMessages)
-        .where(
-          and(
-            analyticsPrivateDataFilter(postApplicationMessages),
-            inArray(postApplicationMessages.processingStatus, [
-              "auto_linked",
-              "manual_linked",
-            ]),
-            sql`coalesce(${postApplicationMessages.decidedAt}, ${postApplicationMessages.receivedAt}) < ${args.cutoffMs}`,
           ),
         ),
       db
@@ -917,29 +879,6 @@ export async function getHistoricalServerEventReplayCandidates(args: {
         urlPath: "/applications/in-progress",
         data: toPrimitiveRecord({
           source: accepted.source,
-        }),
-      }),
-    );
-  }
-
-  for (const row of messageRows) {
-    const occurredAt =
-      typeof row.decidedAt === "number" && Number.isFinite(row.decidedAt)
-        ? row.decidedAt
-        : row.receivedAt;
-    candidates.push(
-      buildReplayCandidate({
-        eventKey: `tracking_email_matched:${row.id}`,
-        eventName: "tracking_email_matched",
-        occurredAt,
-        urlPath: "/tracking-inbox",
-        data: toPrimitiveRecord({
-          provider: String(row.provider),
-          match_mode:
-            row.processingStatus === "auto_linked"
-              ? "auto_link"
-              : "manual_review",
-          result: "success",
         }),
       }),
     );
