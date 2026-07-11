@@ -44,6 +44,22 @@ export const WorkerClientsPage: React.FC = () => {
     queryFn: agencyApi.fetchMyClients,
   });
 
+  // Batched progress for every assigned client — two requests for the whole
+  // page (one per period), not an N+1 call per client.
+  const { data: dailyProgress } = useQuery({
+    queryKey: queryKeys.agency.clientsProgress("day"),
+    queryFn: () => agencyApi.fetchMyClientsProgress("day"),
+    enabled: Boolean(clients && clients.length > 0),
+    staleTime: 30_000,
+  });
+
+  const { data: weeklyProgress } = useQuery({
+    queryKey: queryKeys.agency.clientsProgress("week"),
+    queryFn: () => agencyApi.fetchMyClientsProgress("week"),
+    enabled: Boolean(clients && clients.length > 0),
+    staleTime: 30_000,
+  });
+
   if (isError) {
     showErrorToast(error, "Failed to load clients");
   }
@@ -85,6 +101,11 @@ export const WorkerClientsPage: React.FC = () => {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {clients.map((client) => {
               const statusToken = toStatusToken(client.status);
+              const daily = dailyProgress?.[client.id];
+              const weekly = weeklyProgress?.[client.id];
+              const hasDailyTarget = Boolean(daily?.dailyTarget);
+              const hasWeeklyTarget = Boolean(weekly?.weeklyTarget);
+              const showQuota = hasDailyTarget || hasWeeklyTarget;
               return (
                 <Card
                   key={client.id}
@@ -105,15 +126,51 @@ export const WorkerClientsPage: React.FC = () => {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span>
-                          {client.searchTerms
-                            ? `${JSON.parse(client.searchTerms).length} search terms`
-                            : "No search terms"}
-                        </span>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <span>
+                        {client.searchTerms
+                          ? `${JSON.parse(client.searchTerms).length} search terms`
+                          : "No search terms"}
+                      </span>
+                    </div>
+
+                    {showQuota && (
+                      <div className="space-y-2 border-t border-border/60 pt-3">
+                        {hasDailyTarget && daily && (
+                          <div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-muted-foreground">Today</span>
+                              <span className="font-medium tabular-nums">
+                                {daily.applied}/{daily.dailyTarget}
+                              </span>
+                            </div>
+                            <ProgressBar
+                              value={daily.applied}
+                              max={daily.dailyTarget ?? 0}
+                            />
+                          </div>
+                        )}
+                        {hasWeeklyTarget && weekly && (
+                          <div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-muted-foreground">
+                                This Week
+                              </span>
+                              <span className="font-medium tabular-nums">
+                                {weekly.applied}/{weekly.weeklyTarget}
+                              </span>
+                            </div>
+                            <ProgressBar
+                              value={weekly.applied}
+                              max={weekly.weeklyTarget ?? 0}
+                            />
+                          </div>
+                        )}
                       </div>
+                    )}
+
+                    <div className="flex items-center justify-end pt-1">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -133,3 +190,15 @@ export const WorkerClientsPage: React.FC = () => {
     </>
   );
 };
+
+function ProgressBar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div className="h-2 rounded-full bg-muted overflow-hidden">
+      <div
+        className="h-full rounded-full bg-primary transition-all"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}

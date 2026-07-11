@@ -3,6 +3,7 @@ import { asyncRoute, fail, ok } from "@infra/http";
 import { getUserId, isSystemAdmin } from "@infra/request-context";
 import * as authSessionsRepo from "@server/repositories/auth-sessions";
 import * as usersRepo from "@server/repositories/users";
+import { getActiveTenantId } from "@server/tenancy/context";
 import { type Request, type Response, Router } from "express";
 import { z } from "zod";
 
@@ -31,6 +32,26 @@ const changeOwnPasswordSchema = z.object({
 function requireSystemAdmin(res: Response): boolean {
   if (isSystemAdmin()) return true;
   fail(res, forbidden("System admin access is required"));
+  return false;
+}
+
+/**
+ * Guards a per-user admin mutation against cross-tenant access. Returns true if
+ * the target user belongs to the active tenant; otherwise emits a 404 (not 403,
+ * to avoid leaking user existence across tenants) and returns false.
+ * (Audit CRITICAL #1: previously admins could reset/disable/delete users in
+ * other tenants by id.)
+ */
+async function requireUserInActiveTenant(
+  res: Response,
+  userId: string,
+): Promise<boolean> {
+  const belongs = await usersRepo.userBelongsToTenant({
+    userId,
+    tenantId: getActiveTenantId(),
+  });
+  if (belongs) return true;
+  fail(res, notFound("User not found"));
   return false;
 }
 
@@ -98,6 +119,7 @@ workspacesRouter.patch(
       fail(res, badRequest("You cannot disable your own user"));
       return;
     }
+    if (!(await requireUserInActiveTenant(res, userId))) return;
 
     const user = await usersRepo.setUserDisabled(
       userId,
@@ -126,11 +148,9 @@ workspacesRouter.post(
       fail(res, badRequest("User id is required"));
       return;
     }
-    const user = await usersRepo.getUserById(userId);
-    if (!user) {
-      fail(res, notFound("User not found"));
-      return;
-    }
+    // Existence + cross-tenant guard. userBelongsToTenant covers both: a user
+    // outside this tenant is treated as "not found" (no existence leak).
+    if (!(await requireUserInActiveTenant(res, userId))) return;
 
     await usersRepo.updateUserPassword({
       id: userId,

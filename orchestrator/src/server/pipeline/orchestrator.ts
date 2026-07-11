@@ -7,6 +7,7 @@
  * 3. Leave all jobs in "discovered" for manual processing
  */
 
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { AppErrorCode } from "@infra/errors";
 import { logger } from "@infra/logger";
@@ -1038,15 +1039,47 @@ export async function generateFinalPdf(
       });
       if (!updatedJob) {
         const latestJob = await jobsRepo.getJobById(job.id);
-        if (
-          latestJob?.pdfRegenerating &&
-          (latestJob.status !== expectedStatusAtCommit ||
-            (job.status === "ready" && latestJob.pdfSource !== "generated"))
-        ) {
-          await jobsRepo.updateJob(job.id, { pdfRegenerating: false });
+        // Roll back our optimistic state unless a newer regeneration has
+        // already committed successfully — the only row state a successful
+        // finalize produces is status="ready" with pdfRegenerating=false.
+        // Touching the row then would clobber the newer run's win. Otherwise
+        // mirror the outer catch: restore the original status (when it wasn't
+        // "ready") and clear our flag, so a superseded generation cannot leave
+        // a non-ready job stuck in "processing" (phantom-processing bug,
+        // audit F7.1/F7.2).
+        const newerRunCommittedReady =
+          latestJob?.status === "ready" && latestJob?.pdfRegenerating === false;
+        if (!newerRunCommittedReady) {
+          try {
+            await jobsRepo.updateJob(job.id, {
+              ...(jobStatusToRestore && jobStatusToRestore !== "ready"
+                ? { status: jobStatusToRestore }
+                : {}),
+              pdfRegenerating: false,
+            });
+          } catch (restoreError) {
+            jobLogger.warn(
+              "Failed to restore job status after superseded PDF generation",
+              {
+                restoreStatus: jobStatusToRestore,
+                error: restoreError,
+              },
+            );
+          }
         }
         pdfRegeneratingMarked = false;
         await settlePdfUsage(0);
+
+        // Best-effort cleanup of the orphaned PDF produced by this superseded
+        // run; a deletion failure must never break the flow.
+        if (pdfResult.pdfPath) {
+          try {
+            await rm(pdfResult.pdfPath, { force: true });
+          } catch {
+            /* ignore — best effort, file may already be gone */
+          }
+        }
+
         return {
           success: false,
           error: "PDF generation was superseded by newer job changes.",

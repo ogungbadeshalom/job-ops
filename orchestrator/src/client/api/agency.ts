@@ -100,6 +100,15 @@ export async function fetchClientProgress(
   );
 }
 
+export async function fetchMyClientsProgress(
+  period: "day" | "week",
+): Promise<Record<string, ClientProgress>> {
+  const response = await fetchApi<{ progress: Record<string, ClientProgress> }>(
+    `/clients/progress?period=${period}`,
+  );
+  return response.progress;
+}
+
 export async function createClient(
   data: CreateClientInput,
 ): Promise<ClientWithAssignment> {

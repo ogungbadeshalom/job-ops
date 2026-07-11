@@ -268,4 +268,176 @@ describe.sequential("Manual jobs API routes", () => {
       analyticsOrigin: "manual_job_create",
     });
   });
+
+  it("leaves a failed-to-score manual import as discovered, not ready (audit F5.3)", async () => {
+    const { scoreJobSuitability } = await import("@server/services/scorer");
+    vi.mocked(scoreJobSuitability).mockRejectedValueOnce(
+      new Error("LLM blew up"),
+    );
+
+    const res = await fetch(`${baseUrl}/api/manual-jobs/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        job: {
+          title: "Backend Engineer",
+          employer: "Acme",
+          jobUrl: "https://example.com/jobs/score-fail",
+          jobDescription: "Great role",
+        },
+      }),
+    });
+    const body = await res.json();
+    expect(res.status).toBe(200);
+
+    // Wait for the async scorer to settle and flip status.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const followupRes = await fetch(`${baseUrl}/api/jobs/${body.data.id}`);
+    const followupBody = await followupRes.json();
+    expect(followupBody.ok).toBe(true);
+    expect(followupBody.data.status).toBe("discovered");
+    expect(followupBody.data.suitabilityScore).toBeNull();
+  });
+
+  describe("worker client-orphan guards (audit F1.1/F1.2)", () => {
+    // Real auth is required: the test-utils auth bypass assigns role "admin",
+    // but these guards only fire for role "worker".
+    const AUTH_ENV = {
+      BASIC_AUTH_USER: "admin",
+      BASIC_AUTH_PASSWORD: "secret",
+      JWT_SECRET: "an-explicit-jwt-secret-with-at-least-32-chars",
+      JOBOPS_TEST_AUTH_BYPASS: "0",
+    };
+
+    async function login(username: string, password: string) {
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      return body.data.token as string;
+    }
+
+    beforeEach(async () => {
+      await stopServer({ server, closeDb, tempDir });
+      ({ server, baseUrl, closeDb, tempDir } = await startServer({
+        env: AUTH_ENV,
+      }));
+    });
+
+    it("refuses manual import with 422 when a worker has 0 assigned clients", async () => {
+      const { createPrivateWorkspaceUser } = await import(
+        "@server/repositories/users"
+      );
+      await createPrivateWorkspaceUser({
+        username: "worker-orphan",
+        password: "worker-pass-123",
+        displayName: "Orphan Worker",
+        isSystemAdmin: false,
+        useDefaultTenant: true,
+        role: "worker",
+      });
+      const token = await login("worker-orphan", "worker-pass-123");
+
+      const res = await fetch(`${baseUrl}/api/manual-jobs/import`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          job: {
+            title: "Backend Engineer",
+            employer: "Acme",
+            jobUrl: "https://example.com/jobs/orphan",
+            jobDescription: "Great role",
+          },
+        }),
+      });
+      const body = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(body.ok).toBe(false);
+      expect(body.error.code).toBe("UNPROCESSABLE_ENTITY");
+      expect(body.error.message).toContain(
+        "Select a client before importing a job",
+      );
+      expect(body.error.message).toContain("0");
+    });
+
+    it("refuses manual import with 422 when a worker has 2 assigned clients", async () => {
+      const { createClient } = await import("@server/repositories/clients");
+      const { createAssignment } = await import(
+        "@server/repositories/worker-assignments"
+      );
+      const { createPrivateWorkspaceUser } = await import(
+        "@server/repositories/users"
+      );
+      const adminToken = await login("admin", "secret");
+      const adminMeRes = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      const adminMe = await adminMeRes.json();
+      const adminId = adminMe.data.user.id;
+
+      const clientA = await createClient({
+        id: crypto.randomUUID(),
+        tenantId: "tenant_default",
+        name: "Client A (multi)",
+        email: "client-a-multi@example.com",
+        searchTerms: "[]",
+        workplaceTypes: "[]",
+        searchCities: "[]",
+        createdBy: adminId,
+      });
+      const clientB = await createClient({
+        id: crypto.randomUUID(),
+        tenantId: "tenant_default",
+        name: "Client B (multi)",
+        email: "client-b-multi@example.com",
+        searchTerms: "[]",
+        workplaceTypes: "[]",
+        searchCities: "[]",
+        createdBy: adminId,
+      });
+
+      const workerUser = await createPrivateWorkspaceUser({
+        username: "worker-multi",
+        password: "worker-pass-123",
+        displayName: "Multi Worker",
+        isSystemAdmin: false,
+        useDefaultTenant: true,
+        role: "worker",
+      });
+      await createAssignment({ workerId: workerUser.id, clientId: clientA.id });
+      await createAssignment({ workerId: workerUser.id, clientId: clientB.id });
+
+      const token = await login("worker-multi", "worker-pass-123");
+
+      const res = await fetch(`${baseUrl}/api/manual-jobs/import`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          job: {
+            title: "Backend Engineer",
+            employer: "Acme",
+            jobUrl: "https://example.com/jobs/multi-orphan",
+            jobDescription: "Great role",
+          },
+        }),
+      });
+      const body = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(body.ok).toBe(false);
+      expect(body.error.code).toBe("UNPROCESSABLE_ENTITY");
+      expect(body.error.message).toContain("2");
+    });
+  });
 });

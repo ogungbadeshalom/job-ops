@@ -306,19 +306,29 @@ describe.sequential("Role-based client isolation", () => {
     });
     expect(readRes.status).toBe(200);
 
+    // An authenticated client is FORBIDDEN from mutating jobs/notes (403),
+    // not UNAUTHORIZED (401). 401 is reserved for missing/invalid auth.
     const patchRes = await fetch(`${baseUrl}/api/jobs/${jobC.id}`, {
       method: "PATCH",
       headers: authHeaders(clientToken),
       body: JSON.stringify({ status: "applied" }),
     });
-    expect(patchRes.status).toBe(401);
+    expect(patchRes.status).toBe(403);
 
     const noteRes = await fetch(`${baseUrl}/api/jobs/${jobC.id}/notes`, {
       method: "POST",
       headers: authHeaders(clientToken),
       body: JSON.stringify({ title: "My note", content: "Test note content" }),
     });
-    expect(noteRes.status).toBe(401);
+    expect(noteRes.status).toBe(403);
+
+    // Unauthenticated (no Authorization header) must be 401, not 403.
+    const unauthPatchRes = await fetch(`${baseUrl}/api/jobs/${jobC.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "applied" }),
+    });
+    expect(unauthPatchRes.status).toBe(401);
 
     const gotJob = await fetch(`${baseUrl}/api/jobs/${jobC.id}`, {
       headers: { Authorization: `Bearer ${clientToken}` },

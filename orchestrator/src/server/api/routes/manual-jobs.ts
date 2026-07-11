@@ -304,7 +304,10 @@ manualJobsRouter.post("/import", async (req: Request, res: Response) => {
       }
     }
 
-    // Auto-associate manually imported jobs with a worker's single assigned client.
+    // Auto-associate manually imported jobs with a worker's single assigned
+    // client. With zero or more than one assignment the worker MUST pick a
+    // specific client — otherwise the job persists with clientId=null and
+    // becomes invisible to every client dashboard (silent orphaning). Refuse.
     let resolvedClientId: string | undefined;
     if (getRole() === "worker") {
       const currentUserId = getUserId();
@@ -316,6 +319,15 @@ manualJobsRouter.post("/import", async (req: Request, res: Response) => {
           logger.info(
             "Auto-associated manual import with single assigned client",
             { clientId: resolvedClientId, workerId: currentUserId },
+          );
+        } else {
+          return fail(
+            res,
+            new AppError({
+              status: 422,
+              code: "UNPROCESSABLE_ENTITY",
+              message: `Select a client before importing a job (you have ${assignedClientIds.length} assigned clients).`,
+            }),
           );
         }
       }
@@ -411,7 +423,10 @@ manualJobsRouter.post("/import", async (req: Request, res: Response) => {
           jobId: processedJob.id,
           error,
         });
-        await jobsRepo.updateJob(processedJob.id, { status: "ready" });
+        // Do NOT flip to "ready" on scoring/brief failure: an unscored,
+        // unbriefed job marked ready is silently broken. Leave it visibly
+        // not-ready ("discovered") so it can be re-scored.
+        await jobsRepo.updateJob(processedJob.id, { status: "discovered" });
       }
     })().catch((error) => {
       logger.warn("Manual job scoring task failed to start", {

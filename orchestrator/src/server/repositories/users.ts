@@ -4,6 +4,7 @@ import {
   DEFAULT_TENANT_ID,
   DEFAULT_TENANT_NAME,
 } from "@server/tenancy/constants";
+import { getActiveTenantId } from "@server/tenancy/context";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "../db";
 
@@ -127,6 +128,10 @@ export async function getUserById(id: string): Promise<PublicUser | null> {
 }
 
 export async function listUsers(): Promise<PublicUser[]> {
+  // Scope to the active tenant — the admin user-management surface must never
+  // enumerate users from other tenants. (Audit CRITICAL #1: previously returned
+  // users across ALL tenants.)
+  const tenantId = getActiveTenantId();
   const rows = await db
     .select({
       id: users.id,
@@ -142,7 +147,8 @@ export async function listUsers(): Promise<PublicUser[]> {
     })
     .from(users)
     .innerJoin(tenantMemberships, eq(tenantMemberships.userId, users.id))
-    .innerJoin(tenants, eq(tenants.id, tenantMemberships.tenantId));
+    .innerJoin(tenants, eq(tenants.id, tenantMemberships.tenantId))
+    .where(eq(tenantMemberships.tenantId, tenantId));
 
   return rows.map(mapUser);
 }

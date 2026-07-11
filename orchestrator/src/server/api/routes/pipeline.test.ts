@@ -777,6 +777,60 @@ describe.sequential("Pipeline API routes", () => {
     expect(blockedNaukriBody.error.message).toContain("incompatible");
   });
 
+  it("refuses a pipeline run with 422 when a worker has 0 assigned clients (audit F1.1)", async () => {
+    // Real auth is required: the test-utils auth bypass assigns role "admin",
+    // but the orphan guard only fires for role "worker".
+    await stopServer({ server, closeDb, tempDir });
+    ({ server, baseUrl, closeDb, tempDir } = await startServer({
+      env: {
+        BASIC_AUTH_USER: "admin",
+        BASIC_AUTH_PASSWORD: "secret",
+        JWT_SECRET: "an-explicit-jwt-secret-with-at-least-32-chars",
+        JOBOPS_TEST_AUTH_BYPASS: "0",
+      },
+    }));
+    const { createPrivateWorkspaceUser } = await import(
+      "@server/repositories/users"
+    );
+
+    await createPrivateWorkspaceUser({
+      username: "worker-orphan-run",
+      password: "worker-pass-123",
+      displayName: "Orphan Worker",
+      isSystemAdmin: false,
+      useDefaultTenant: true,
+      role: "worker",
+    });
+    const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "worker-orphan-run", password: "worker-pass-123" }),
+    });
+    const loginBody = await loginRes.json();
+    const token = loginBody.data.token;
+
+    const res = await fetch(`${baseUrl}/api/pipeline/run`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sources: ["linkedin"],
+        searchTerms: ["engineer"],
+      }),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("UNPROCESSABLE_ENTITY");
+    expect(body.error.message).toContain(
+      "Select a client before running the pipeline",
+    );
+    expect(body.error.message).toContain("0");
+  });
+
   it("returns a standard quota error when hosted pipeline runs are exhausted", async () => {
     await stopServer({ server, closeDb, tempDir });
     ({ server, baseUrl, closeDb, tempDir } = await startServer({

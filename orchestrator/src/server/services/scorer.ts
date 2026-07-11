@@ -108,16 +108,48 @@ export async function scoreJobSuitability(
     ? (options.scoringInstructions ?? "")
     : (settings.scoringInstructions?.value ?? "");
 
-  const prompt = buildScoringPrompt(job, sanitizeProfileForPrompt(profile), {
-    instructions: scoringInstructions,
-    promptTemplate:
+  return scoreJobWithTemplate(job, profile, {
+    model,
+    template:
       settings.scoringPromptTemplate?.value ??
       getDefaultPromptTemplate("scoringPromptTemplate"),
+    instructions: scoringInstructions,
+    salaryPenalty: {
+      penalizeMissingSalary: settings.penalizeMissingSalary.value,
+      missingSalaryPenalty: settings.missingSalaryPenalty.value,
+    },
+  });
+}
+
+/**
+ * Shared scoring core used by both production (`scoreJobSuitability`) and the
+ * eval harness (`scoreJobWithPromptVersion`). Builds the prompt from an
+ * explicit template + instructions, calls the LLM, clamps/validates, and
+ * applies the salary penalty. Production behavior is unchanged because
+ * `scoreJobSuitability` resolves the same inputs from Settings and delegates
+ * here.
+ */
+async function scoreJobWithTemplate(
+  job: Job,
+  profile: Record<string, unknown>,
+  args: {
+    model: string;
+    template: string;
+    instructions: string;
+    salaryPenalty: {
+      penalizeMissingSalary: boolean;
+      missingSalaryPenalty: number;
+    };
+  },
+): Promise<SuitabilityResult> {
+  const prompt = buildScoringPrompt(job, sanitizeProfileForPrompt(profile), {
+    instructions: args.instructions,
+    promptTemplate: args.template,
   });
 
   const llm = await createConfiguredLlmService("scoring");
   const result = await llm.callJson<{ score: number; reason: string }>({
-    model,
+    model: args.model,
     messages: [{ role: "user", content: prompt }],
     jsonSchema: SCORING_SCHEMA,
     maxRetries: 2,
@@ -151,14 +183,49 @@ export async function scoreJobSuitability(
 
   // Apply salary penalty if enabled
   const penaltyResult = applySalaryPenalty(job, clampedScore, clampedReason, {
-    penalizeMissingSalary: settings.penalizeMissingSalary.value,
-    missingSalaryPenalty: settings.missingSalaryPenalty.value,
+    penalizeMissingSalary: args.salaryPenalty.penalizeMissingSalary,
+    missingSalaryPenalty: args.salaryPenalty.missingSalaryPenalty,
   });
 
   return {
     score: penaltyResult.score,
     reason: penaltyResult.reason,
   };
+}
+
+/**
+ * EVAL ENTRY POINT. Scores a job under an explicit prompt version (see
+ * prompts/versions/scoring.versions.ts) instead of the live per-tenant
+ * template. Used by the scoring eval harness; does NOT change production
+ * behavior. Inherits the same LLM call, clamping, validation, and salary
+ * penalty as production scoring via the shared `scoreJobWithTemplate` core.
+ *
+ * `salaryPenalty` defaults to a no-op (do not penalize) so eval results reflect
+ * the raw model output under the prompt version; pass an explicit override to
+ * mirror a tenant's penalty config.
+ */
+export async function scoreJobWithPromptVersion(
+  job: Job,
+  profile: Record<string, unknown>,
+  options: {
+    model: string;
+    template: string;
+    instructions?: string;
+    salaryPenalty?: {
+      penalizeMissingSalary: boolean;
+      missingSalaryPenalty: number;
+    };
+  },
+): Promise<SuitabilityResult> {
+  return scoreJobWithTemplate(job, profile, {
+    model: options.model,
+    template: options.template,
+    instructions: options.instructions ?? "",
+    salaryPenalty: options.salaryPenalty ?? {
+      penalizeMissingSalary: false,
+      missingSalaryPenalty: 0,
+    },
+  });
 }
 
 /**

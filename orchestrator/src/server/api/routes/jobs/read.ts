@@ -1,6 +1,7 @@
 import { badRequest, notFound } from "@infra/errors";
 import { fail, ok } from "@infra/http";
 import { logger } from "@infra/logger";
+import { getRole } from "@infra/request-context";
 import * as jobsRepo from "@server/repositories/jobs";
 import { attachAppliedDuplicateMatches } from "@server/services/applied-duplicate-matching";
 import { getPdfPath, pdfExists } from "@server/services/pdf";
@@ -21,6 +22,7 @@ import {
   jobsRevisionQuerySchema,
   listJobsQuerySchema,
   parseStatusFilter,
+  redactForClientRole,
   requireJob,
   toJobListItem,
   toJobsRouteError,
@@ -78,6 +80,8 @@ jobsReadRouter.get("/", async (req: Request, res: Response) => {
             pdfFingerprintContext,
           );
     primaryQueryMs = performance.now() - primaryQueryStart;
+    const role = getRole();
+    const redactedJobs = jobs.map((job) => redactForClientRole(job, role));
     const candidateCount = 0;
     const duplicateMatchingEnabled = false;
     const statsAggregateStart = performance.now();
@@ -88,8 +92,8 @@ jobsReadRouter.get("/", async (req: Request, res: Response) => {
     revisionAggregateMs = performance.now() - revisionAggregateStart;
 
     const response = {
-      jobs,
-      total: jobs.length,
+      jobs: redactedJobs,
+      total: redactedJobs.length,
       byStatus: stats,
       revision: revision.revision,
     };
@@ -178,7 +182,8 @@ jobsReadRouter.get("/:id", async (req: Request, res: Response) => {
       [job],
       await jobsRepo.getAppliedDuplicateMatchCandidates(),
     );
-    ok(res, await hydrateJobPdfFreshness(jobWithAppliedDuplicateMatch));
+    const hydrated = await hydrateJobPdfFreshness(jobWithAppliedDuplicateMatch);
+    ok(res, redactForClientRole(hydrated, getRole()));
   } catch (error) {
     fail(res, toJobsRouteError(error));
   }

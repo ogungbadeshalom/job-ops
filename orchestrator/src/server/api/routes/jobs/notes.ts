@@ -64,6 +64,8 @@ jobsNotesRouter.get("/:id/notes", async (req: Request, res: Response) => {
   const route = "GET /api/jobs/:id/notes";
 
   try {
+    // Job notes are agency-internal; clients must not read them. (Audit HIGH #4)
+    requireNonClientRole();
     const job = await loadJobOrRespondNotFound(req, res, route, requestId);
     if (!job) return;
 

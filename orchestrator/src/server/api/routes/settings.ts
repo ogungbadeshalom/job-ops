@@ -36,6 +36,7 @@ import {
 import { getEffectiveSettings } from "@server/services/settings";
 import { applySettingsUpdates } from "@server/services/settings-update";
 import { getActiveTenantId } from "@server/tenancy/context";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import {
   mapGlmProviderAlias,
   settingsRegistry,
@@ -300,6 +301,10 @@ async function getCodexAuthResponseData(): Promise<{
 settingsRouter.get(
   "/",
   asyncRoute(async (_req: Request, res: Response) => {
+    // Effective settings include search terms, scoring thresholds, and the
+    // master-resume project catalog — agency-internal. Clients must not read it.
+    // (Audit HIGH #4)
+    requireNonClientRole();
     const data = await getEffectiveSettings();
     ok(res, data);
   }),

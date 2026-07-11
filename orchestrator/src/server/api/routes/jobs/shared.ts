@@ -89,6 +89,14 @@ export function toJobListItem(
   };
 }
 
+/**
+ * Hides the AI suitability score from client-role viewers. The score (and its
+ * explanation) must never reach the client's browser, so this strips them from
+ * the API payload for the `client` role and is a no-op for every other role.
+ * Works for both full `Job` objects and `JobListItem` projections.
+ */
+export { redactForClientRole } from "./client-redaction";
+
 export function queueTailoringAutoPdfRegenerationIfNeeded(
   previousJob: Job,
   nextJob: Job,

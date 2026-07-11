@@ -500,8 +500,10 @@ pipelineRouter.post(
       let resolvedCityLocations = config.cityLocations;
 
       // Auto-associate the run with a worker's single assigned client when no
-      // clientId was provided (e.g. main orchestrator "Run search"). With more
-      // than one assignment the worker must use a specific client dashboard.
+      // clientId was provided (e.g. main orchestrator "Run search"). With zero
+      // or more than one assignment the worker MUST pick a specific client —
+      // otherwise discovered jobs persist with clientId=null and become
+      // invisible to every client dashboard (silent orphaning). Refuse here.
       if (!config.clientId && getRole() === "worker") {
         const currentUserId = getUserId();
         if (currentUserId) {
@@ -512,6 +514,15 @@ pipelineRouter.post(
             logger.info(
               "Auto-associated pipeline run with single assigned client",
               { clientId: config.clientId, workerId: currentUserId },
+            );
+          } else {
+            return fail(
+              res,
+              new AppError({
+                status: 422,
+                code: "UNPROCESSABLE_ENTITY",
+                message: `Select a client before running the pipeline (you have ${assignedClientIds.length} assigned clients).`,
+              }),
             );
           }
         }

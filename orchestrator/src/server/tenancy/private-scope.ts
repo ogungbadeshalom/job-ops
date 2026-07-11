@@ -90,6 +90,9 @@ export function privateDataScopeFilter(table: UserScopedTable): SQL {
  * - worker: only records for clients assigned to this worker via worker_client_assignments
  * - client: only records where clientId matches the client profile linked to this user
  *
+ * Both subqueries are tenant-bounded via `tenant_id` to prevent cross-tenant client IDs
+ * from leaking when a userId appears in multiple tenants (audit CRITICAL #2).
+ *
  * Combine with privateDataScopeFilter() via and(...) for full tenant+user+client scoping.
  */
 export function clientDataScopeFilter(
@@ -104,16 +107,22 @@ export function clientDataScopeFilter(
   const userId = getUserId();
   if (!userId) return undefined;
 
+  const tenantId = getActiveTenantId();
+
   if (role === "worker") {
     return sql`${table.clientId} IN (
       SELECT client_id FROM worker_client_assignments
-      WHERE worker_id = ${userId} AND status = 'active'
+      WHERE worker_id = ${userId}
+        AND status = 'active'
+        AND tenant_id = ${tenantId}
     )`;
   }
 
   if (role === "client") {
     return sql`${table.clientId} IN (
-      SELECT id FROM clients WHERE created_by = ${userId}
+      SELECT id FROM clients
+      WHERE created_by = ${userId}
+        AND tenant_id = ${tenantId}
     )`;
   }
 

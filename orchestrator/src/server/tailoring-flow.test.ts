@@ -203,6 +203,101 @@ describe("Tailoring Flow", () => {
     );
   });
 
+  it("restores the original status when a superseded generation would otherwise leave a non-ready job stuck in processing (F7.1/F7.2)", async () => {
+    // A non-ready job whose generation loses the optimistic-concurrency race
+    // (e.g. its status was changed out from under it). Previously this branch
+    // only cleared pdfRegenerating and never restored the status, leaving the
+    // job stranded in "processing" forever.
+    const discoveredJob = {
+      id: "job-discovered-superseded",
+      jobDescription: "Backend Engineer",
+      status: "discovered",
+      tailoredSummary: "Summary",
+      tailoredHeadline: "Headline",
+      tailoredSkills: JSON.stringify(["Go"]),
+      selectedProjectIds: "project-b",
+    };
+    // The row no longer matches the expected commit state, and crucially is
+    // NOT a newer successful regeneration (not status="ready").
+    const supersededJob = {
+      ...discoveredJob,
+      status: "discovered",
+      pdfRegenerating: true,
+    };
+
+    vi.mocked(jobsRepo.getJobById)
+      .mockResolvedValueOnce(discoveredJob as any) // initial read
+      .mockResolvedValueOnce(supersededJob as any); // re-read after supersede
+    vi.mocked(pdfService.generatePdf).mockResolvedValue({
+      success: true,
+      // Non-existent path: rm(..., {force:true}) no-ops, exercising cleanup
+      // without touching the real filesystem.
+      pdfPath: "generated/orphaned-superseded.pdf",
+    });
+    vi.mocked(jobsRepo.finalizeGeneratedPdfIfCurrent).mockResolvedValue(null);
+
+    const result = await generateFinalPdf("job-discovered-superseded");
+
+    expect(result).toEqual({
+      success: false,
+      error: "PDF generation was superseded by newer job changes.",
+      errorCode: "CONFLICT",
+    });
+    // The last updateJob must restore BOTH the original status AND clear the
+    // flag — this is the regression guard for the phantom-processing bug.
+    expect(jobsRepo.updateJob).toHaveBeenLastCalledWith(
+      "job-discovered-superseded",
+      { status: "discovered", pdfRegenerating: false },
+    );
+  });
+
+  it("does not clobber a newer regeneration that already committed ready", async () => {
+    // Supersede because a concurrent regeneration won and committed
+    // status="ready" with pdfRegenerating=false. The losing run must leave the
+    // row untouched (no status write, no pdfRegenerating write).
+    const readyJob = {
+      id: "job-ready-race",
+      jobDescription: "Staff Engineer",
+      status: "ready",
+      pdfPath: "data/pdfs/resume_job-ready-race.pdf",
+      pdfSource: "generated",
+      tailoredSummary: "Summary",
+      tailoredHeadline: "Headline",
+      tailoredSkills: JSON.stringify(["Rust"]),
+      selectedProjectIds: "project-c",
+    };
+    const newerCommittedJob = {
+      ...readyJob,
+      status: "ready",
+      pdfRegenerating: false,
+      pdfPath: "data/pdfs/resume_job-ready-race_v2.pdf",
+    };
+
+    vi.mocked(jobsRepo.getJobById)
+      .mockResolvedValueOnce(readyJob as any)
+      .mockResolvedValueOnce(newerCommittedJob as any);
+    vi.mocked(pdfService.generatePdf).mockResolvedValue({
+      success: true,
+      pdfPath: "generated/orphaned-loser.pdf",
+    });
+    vi.mocked(jobsRepo.finalizeGeneratedPdfIfCurrent).mockResolvedValue(null);
+
+    const result = await generateFinalPdf("job-ready-race");
+
+    expect(result).toEqual({
+      success: false,
+      error: "PDF generation was superseded by newer job changes.",
+      errorCode: "CONFLICT",
+    });
+    // updateJob calls: only the initial "pdfRegenerating: true" mark at entry
+    // (job.status === "ready" branch). The supersede branch must NOT issue a
+    // second updateJob, since a newer run owns the row.
+    expect(jobsRepo.updateJob).toHaveBeenCalledTimes(1);
+    expect(jobsRepo.updateJob).toHaveBeenNthCalledWith(1, "job-ready-race", {
+      pdfRegenerating: true,
+    });
+  });
+
   it("keeps ready jobs ready when PDF regeneration fails", async () => {
     const readyJob = {
       id: "job-ready-789",

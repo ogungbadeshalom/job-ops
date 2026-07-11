@@ -143,6 +143,8 @@ export const queryKeys = {
   agency: {
     all: ["agency"] as const,
     clients: () => [...queryKeys.agency.all, "clients"] as const,
+    clientsProgress: (period: "day" | "week") =>
+      [...queryKeys.agency.all, "clients-progress", period] as const,
     client: (id: string) => [...queryKeys.agency.all, "client", id] as const,
     clientStats: (id: string) =>
       [...queryKeys.agency.all, "client-stats", id] as const,

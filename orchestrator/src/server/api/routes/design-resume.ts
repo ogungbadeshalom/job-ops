@@ -259,6 +259,8 @@ function queueDesignResumeAutoPdfRegeneration(route: string): void {
 designResumeRouter.get(
   "/",
   asyncRoute(async (_req: Request, res: Response) => {
+    // Master resume is agency-internal; clients must not read it. (Audit HIGH #4)
+    requireNonClientRole();
     const document = await getCurrentDesignResume();
     if (!document) {
       fail(res, notFound("Resume Studio has not been imported yet."));
@@ -440,6 +442,8 @@ designResumeRouter.get(
 designResumeRouter.get(
   "/export",
   asyncRoute(async (_req: Request, res: Response) => {
+    // Master resume export is admin-facing; clients must not access it. (Audit HIGH #4)
+    requireNonClientRole();
     ok(res, await exportDesignResume());
   }),
 );
@@ -447,6 +451,8 @@ designResumeRouter.get(
 designResumeRouter.post(
   "/generate-pdf",
   asyncRoute(async (req: Request, res: Response) => {
+    // Expensive + overwrites the shared tenant PDF; clients must not trigger it. (Audit HIGH #4)
+    requireNonClientRole();
     ok(
       res,
       await generateDesignResumePdf({
@@ -459,10 +465,12 @@ designResumeRouter.post(
 designResumeRouter.get(
   "/pdf",
   asyncRoute(async (_req: Request, res: Response) => {
+    // Master resume PDF is agency-internal; clients must not download it. (Audit HIGH #4)
+    requireNonClientRole();
     const pdfPath = getTenantDesignResumePdfPath();
     res.setHeader("Cache-Control", "no-store");
     res.sendFile(pdfPath, (error) => {
-      if (error) {
+      if (error && !res.headersSent) {
         fail(res, notFound("Resume Studio PDF not found"));
       }
     });

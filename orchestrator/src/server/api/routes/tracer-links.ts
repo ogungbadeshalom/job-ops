@@ -6,6 +6,7 @@ import {
   getTracerAnalytics,
   getTracerReadiness,
 } from "@server/services/tracer-links";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { type Request, type Response, Router } from "express";
 import { z } from "zod";
 
@@ -102,6 +103,9 @@ tracerLinksRouter.get(
 tracerLinksRouter.get(
   "/analytics",
   asyncRoute(async (req: Request, res: Response) => {
+    // Tracer analytics reveal which companies (employers) jobs point at across
+    // the tenant; clients must not see other clients' data. (Audit HIGH #4)
+    requireNonClientRole();
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) {
       fail(res, badRequest(parsed.error.message, parsed.error.flatten()));
@@ -129,6 +133,8 @@ tracerLinksRouter.get(
 tracerLinksRouter.get(
   "/jobs/:jobId",
   asyncRoute(async (req: Request, res: Response) => {
+    // Per-job tracer stats are agency-internal; clients must not read them. (Audit HIGH #4)
+    requireNonClientRole();
     const parsedParams = paramsSchema.safeParse(req.params);
     if (!parsedParams.success) {
       fail(

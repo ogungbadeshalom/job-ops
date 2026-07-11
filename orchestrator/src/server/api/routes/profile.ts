@@ -11,6 +11,7 @@ import {
   RxResumeAuthConfigError,
 } from "@server/services/rxresume";
 import { getConfiguredRxResumeBaseResumeId } from "@server/services/rxresume/baseResumeId";
+import { requireNonClientRole } from "@server/tenancy/private-scope";
 import { type Request, type Response, Router } from "express";
 
 export const profileRouter = Router();
@@ -20,6 +21,8 @@ export const profileRouter = Router();
  */
 profileRouter.get("/projects", async (_req: Request, res: Response) => {
   try {
+    // Base-resume project catalog is agency-internal; clients must not read it. (Audit HIGH #4)
+    requireNonClientRole();
     if (isDemoMode()) {
       ok(res, DEMO_PROJECT_CATALOG);
       return;
@@ -37,6 +40,8 @@ profileRouter.get("/projects", async (_req: Request, res: Response) => {
  */
 profileRouter.get("/", async (_req: Request, res: Response) => {
   try {
+    // Full master resume profile is agency-internal; clients must not read it. (Audit HIGH #4)
+    requireNonClientRole();
     const profile = await getProfile();
     ok(res, profile);
   } catch (error) {
@@ -97,6 +102,8 @@ profileRouter.get("/status", async (_req: Request, res: Response) => {
  */
 profileRouter.post("/refresh", async (_req: Request, res: Response) => {
   try {
+    // Refreshing the master profile is admin-facing + can trigger expensive fetches; clients must not. (Audit HIGH #4)
+    requireNonClientRole();
     clearProfileCache();
     clearRxResumeResumeCache();
     const profile = await getProfile(true);

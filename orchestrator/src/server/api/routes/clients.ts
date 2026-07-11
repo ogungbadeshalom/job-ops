@@ -75,6 +75,52 @@ clientsRouter.get(
 );
 
 clientsRouter.get(
+  "/progress",
+  asyncRoute(async (req: Request, res: Response) => {
+    requireRole("admin", "owner", "worker");
+    const userId = getUserId();
+    if (!userId) {
+      return fail(res, forbidden("Authenticated user context is required"));
+    }
+
+    // Resolve the client set the requester may see: workers only get their
+    // assigned clients; admins/owners see all tenant clients.
+    const role = getRole();
+    const clients =
+      role === "admin" || role === "owner"
+        ? await listClients()
+        : await listClientsForWorker(userId);
+
+    const period = (req.query.period === "week" ? "week" : "day") as
+      | "day"
+      | "week";
+
+    // `getClientApplicationProgress` returns BOTH daily and weekly targets
+    // regardless of the requested period, so a single call per client is enough.
+    const entries = await Promise.all(
+      clients.map(async (client) => {
+        const progress = await getClientApplicationProgress(client.id, period);
+        return [client.id, progress] as const;
+      }),
+    );
+
+    const progress: Record<
+      string,
+      {
+        applied: number;
+        dailyTarget: number | null;
+        weeklyTarget: number | null;
+      }
+    > = {};
+    for (const [id, p] of entries) {
+      progress[id] = p;
+    }
+
+    ok(res, { progress });
+  }),
+);
+
+clientsRouter.get(
   "/:id",
   asyncRoute(async (req: Request, res: Response) => {
     const userId = getUserId();

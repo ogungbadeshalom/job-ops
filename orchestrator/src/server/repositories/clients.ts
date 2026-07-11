@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { revokeAuthSessionsForUser } from "@server/repositories/auth-sessions";
+import { deleteUser } from "@server/repositories/users";
 import { getActiveTenantId } from "@server/tenancy/context";
+import { logger } from "@server/infra/logger";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "../db";
 
@@ -204,6 +207,14 @@ export async function deleteClient(id: string): Promise<boolean> {
   const client = await getClientById(id);
   if (!client) return false;
 
+  // Resolve the client's login user BEFORE deleting the client row.
+  // getClientLoginStatus() reads the clients row + tenant_memberships, so it
+  // must run while the client still exists. Capture the userId up front, then
+  // tear down the user + sessions after the client row is gone (the clients
+  // row cascades nothing on the users side; deleting the user after the client
+  // avoids leaving an orphaned login that could still authenticate).
+  const { clientUserId } = await getClientLoginStatus(id);
+
   db.transaction((tx) => {
     tx.delete(workerClientAssignments)
       .where(
@@ -217,6 +228,31 @@ export async function deleteClient(id: string): Promise<boolean> {
       .where(and(eq(clients.id, id), eq(clients.tenantId, tenantId)))
       .run();
   });
+
+  // Best-effort cleanup of the client login user and its auth sessions. These
+  // repositories aren't transactional with the client deletion above, so a
+  // failure here must not surface to the caller (the client is already gone).
+  // Log a warn and continue so deleteClient still reports success.
+  if (clientUserId) {
+    try {
+      await revokeAuthSessionsForUser(clientUserId);
+    } catch (err) {
+      logger.warn("Failed to revoke auth sessions for deleted client user", {
+        clientId: id,
+        clientUserId,
+        err,
+      });
+    }
+    try {
+      await deleteUser(clientUserId);
+    } catch (err) {
+      logger.warn("Failed to delete client login user", {
+        clientId: id,
+        clientUserId,
+        err,
+      });
+    }
+  }
 
   return true;
 }

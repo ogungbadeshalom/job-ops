@@ -8,10 +8,7 @@ import {
   listPostApplicationRunMessages,
   runPostApplicationInboxAction,
 } from "@server/services/post-application/review";
-import {
-  requireNonClientRole,
-  requireRole,
-} from "@server/tenancy/private-scope";
+import { requireRole } from "@server/tenancy/private-scope";
 import {
   APPLICATION_STAGES,
   POST_APPLICATION_PROVIDERS,
@@ -135,7 +132,7 @@ postApplicationReviewRouter.post(
   "/inbox/:messageId/approve",
   asyncRoute(async (req: Request, res: Response) => {
     try {
-      requireNonClientRole();
+      requireRole("admin", "owner");
       const { messageId } = inboxParamsSchema.parse(req.params);
       const input = approveBodySchema.parse(req.body ?? {});
 
@@ -165,7 +162,7 @@ postApplicationReviewRouter.post(
   "/inbox/:messageId/deny",
   asyncRoute(async (req: Request, res: Response) => {
     try {
-      requireNonClientRole();
+      requireRole("admin", "owner");
       const { messageId } = inboxParamsSchema.parse(req.params);
       const input = denyBodySchema.parse(req.body ?? {});
 
@@ -191,7 +188,7 @@ postApplicationReviewRouter.post(
   "/inbox/actions",
   asyncRoute(async (req: Request, res: Response) => {
     try {
-      requireNonClientRole();
+      requireRole("admin", "owner");
       const input = actionBodySchema.parse(req.body ?? {});
 
       const result = await runPostApplicationInboxAction({
