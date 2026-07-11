@@ -277,7 +277,7 @@ clientsRouter.post(
     });
 
     if (loginStatus.hasLogin) {
-      await revokeAuthSessionsForUser(loginStatus.clientUserId!);
+      await revokeAuthSessionsForUser(loginStatus.clientUserId!, tenantId);
       await deleteUser(loginStatus.clientUserId!);
     }
 

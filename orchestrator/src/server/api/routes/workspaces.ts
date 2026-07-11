@@ -156,7 +156,7 @@ workspacesRouter.post(
       id: userId,
       password: parsed.data.password,
     });
-    await authSessionsRepo.revokeAuthSessionsForUser(userId);
+    await authSessionsRepo.revokeAuthSessionsForUser(userId, getActiveTenantId());
     ok(res, { userId });
   }),
 );

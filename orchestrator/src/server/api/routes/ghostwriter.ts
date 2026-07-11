@@ -1,6 +1,6 @@
 import { asyncRoute, fail, ok } from "@infra/http";
 import { runWithRequestContext } from "@infra/request-context";
-import { setupSse, writeSseData } from "@infra/sse";
+import { setupSse, startSseHeartbeat, writeSseData } from "@infra/sse";
 import { badRequest, toAppError } from "@server/infra/errors";
 import * as ghostwriterService from "@server/services/ghostwriter";
 import { requireNonClientRole } from "@server/tenancy/private-scope";
@@ -166,6 +166,10 @@ ghostwriterRouter.post(
           cacheControl: "no-cache, no-transform",
           flushHeaders: true,
         });
+        const stopHeartbeat = startSseHeartbeat(res);
+        req.on("close", () => {
+          stopHeartbeat();
+        });
 
         try {
           await ghostwriterService.sendMessageForJob({
@@ -289,6 +293,10 @@ ghostwriterRouter.post(
           cacheControl: "no-cache, no-transform",
           flushHeaders: true,
         });
+        const stopHeartbeat = startSseHeartbeat(res);
+        req.on("close", () => {
+          stopHeartbeat();
+        });
 
         try {
           await ghostwriterService.regenerateMessageForJob({
@@ -384,6 +392,10 @@ ghostwriterRouter.post(
         setupSse(res, {
           cacheControl: "no-cache, no-transform",
           flushHeaders: true,
+        });
+        const stopHeartbeat = startSseHeartbeat(res);
+        req.on("close", () => {
+          stopHeartbeat();
         });
 
         try {
@@ -592,6 +604,10 @@ ghostwriterRouter.post(
           cacheControl: "no-cache, no-transform",
           flushHeaders: true,
         });
+        const stopHeartbeat = startSseHeartbeat(res);
+        req.on("close", () => {
+          stopHeartbeat();
+        });
 
         try {
           await ghostwriterService.sendMessage({
@@ -721,6 +737,10 @@ ghostwriterRouter.post(
         setupSse(res, {
           cacheControl: "no-cache, no-transform",
           flushHeaders: true,
+        });
+        const stopHeartbeat = startSseHeartbeat(res);
+        req.on("close", () => {
+          stopHeartbeat();
         });
 
         try {

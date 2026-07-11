@@ -1,4 +1,4 @@
-import { eq, lte, or } from "drizzle-orm";
+import { and, eq, lte, or } from "drizzle-orm";
 import { db, schema } from "../db/index";
 
 const { authSessions } = schema;
@@ -57,15 +57,21 @@ export async function revokeAuthSession(id: string): Promise<void> {
     .where(eq(authSessions.id, id));
 }
 
-export async function revokeAuthSessionsForUser(userId: string): Promise<void> {
+export async function revokeAuthSessionsForUser(
+  userId: string,
+  tenantId?: string,
+): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
+  const condition = tenantId
+    ? and(eq(authSessions.userId, userId), eq(authSessions.tenantId, tenantId))
+    : eq(authSessions.userId, userId);
   await db
     .update(authSessions)
     .set({
       revokedAt: now,
       updatedAt: new Date(now * 1000).toISOString(),
     })
-    .where(eq(authSessions.userId, userId));
+    .where(condition);
 }
 
 export async function deleteExpiredOrRevokedAuthSessions(): Promise<void> {

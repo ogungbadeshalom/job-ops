@@ -166,5 +166,21 @@ describe.sequential("Admin-data guards (audit HIGH #4 + #5)", () => {
       });
       expect(res.status).toBe(403);
     });
+
+    it("GET /api/clients/progress returns 403 for client", async () => {
+      const { clientToken } = await setupClientRole(baseUrl);
+      const res = await fetch(`${baseUrl}/api/clients/progress?period=day`, {
+        headers: authHeaders(clientToken),
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it("GET /api/watchlist/sources returns 403 for client", async () => {
+      const { clientToken } = await setupClientRole(baseUrl);
+      const res = await fetch(`${baseUrl}/api/watchlist/sources`, {
+        headers: authHeaders(clientToken),
+      });
+      expect(res.status).toBe(403);
+    });
   });
 });

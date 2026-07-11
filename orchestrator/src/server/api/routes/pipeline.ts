@@ -7,6 +7,7 @@ import {
   notFound,
   requestTimeout,
   serviceUnavailable,
+  toAppError,
 } from "@infra/errors";
 import { fail, ok, okWithMeta } from "@infra/http";
 import { logger } from "@infra/logger";
@@ -135,11 +136,7 @@ pipelineRouter.get("/status", async (_req: Request, res: Response) => {
   } catch (error) {
     fail(
       res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
+      toAppError(error),
     );
   }
 });
@@ -155,11 +152,7 @@ pipelineRouter.get("/progress/snapshot", (_req: Request, res: Response) => {
   } catch (error) {
     fail(
       res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
+      toAppError(error),
     );
   }
 });
@@ -204,11 +197,7 @@ pipelineRouter.get("/runs", async (_req: Request, res: Response) => {
   } catch (error) {
     fail(
       res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
+      toAppError(error),
     );
   }
 });
@@ -269,11 +258,7 @@ pipelineRouter.get("/search-presets", async (_req: Request, res: Response) => {
   } catch (error) {
     fail(
       res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
+      toAppError(error),
     );
   }
 });
@@ -304,11 +289,7 @@ pipelineRouter.post("/search-presets", async (req: Request, res: Response) => {
     }
     fail(
       res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
+      toAppError(error),
     );
   }
 });
@@ -345,11 +326,7 @@ pipelineRouter.patch(
       }
       fail(
         res,
-        new AppError({
-          status: 500,
-          code: "INTERNAL_ERROR",
-          message: error instanceof Error ? error.message : "Unknown error",
-        }),
+        toAppError(error),
       );
     }
   },
@@ -369,11 +346,7 @@ pipelineRouter.post(
     } catch (error) {
       fail(
         res,
-        new AppError({
-          status: 500,
-          code: "INTERNAL_ERROR",
-          message: error instanceof Error ? error.message : "Unknown error",
-        }),
+        toAppError(error),
       );
     }
   },
@@ -393,11 +366,7 @@ pipelineRouter.delete(
     } catch (error) {
       fail(
         res,
-        new AppError({
-          status: 500,
-          code: "INTERNAL_ERROR",
-          message: error instanceof Error ? error.message : "Unknown error",
-        }),
+        toAppError(error),
       );
     }
   },
@@ -414,11 +383,7 @@ pipelineRouter.post("/search-plan", async (req: Request, res: Response) => {
     }
     fail(
       res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
+      toAppError(error),
     );
   }
 });
@@ -439,11 +404,7 @@ pipelineRouter.get(
     } catch (error) {
       fail(
         res,
-        new AppError({
-          status: 500,
-          code: "INTERNAL_ERROR",
-          message: error instanceof Error ? error.message : "Unknown error",
-        }),
+        toAppError(error),
       );
     }
   },
@@ -535,7 +496,13 @@ pipelineRouter.post(
         }
 
         const currentUserId = getUserId();
-        if (currentUserId && !isSystemAdmin()) {
+        // Any non-admin (worker OR member OR client) must be explicitly assigned
+        // to the target client. Admins/owners may target any client. Don't skip
+        // the check when userId is absent — treat that as forbidden too.
+        if (!isSystemAdmin()) {
+          if (!currentUserId) {
+            return fail(res, forbidden("You are not assigned to this client"));
+          }
           const assigned = await isWorkerAssignedToClient(
             currentUserId,
             config.clientId,
@@ -738,11 +705,7 @@ pipelineRouter.post(
       }
       fail(
         res,
-        new AppError({
-          status: 500,
-          code: "INTERNAL_ERROR",
-          message: error instanceof Error ? error.message : "Unknown error",
-        }),
+        toAppError(error),
       );
     }
   },
@@ -777,11 +740,7 @@ pipelineRouter.post("/cancel", async (_req: Request, res: Response) => {
   } catch (error) {
     fail(
       res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
+      toAppError(error),
     );
   }
 });
@@ -804,11 +763,7 @@ pipelineRouter.post("/resume-scoring", async (_req: Request, res: Response) => {
   } catch (error) {
     fail(
       res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
+      toAppError(error),
     );
   }
 });
@@ -951,11 +906,7 @@ pipelineRouter.post("/solve-challenge", async (req: Request, res: Response) => {
     }
     fail(
       res,
-      new AppError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      }),
+      toAppError(error),
     );
   }
 });

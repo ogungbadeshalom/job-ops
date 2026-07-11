@@ -74,26 +74,6 @@ function getCurrentSourceStatsForTenant(
   return stats;
 }
 
-let currentProgress: PipelineProgress = {
-  step: "idle",
-  message: "Ready",
-  crawlingSource: null,
-  crawlingSourcesCompleted: 0,
-  crawlingSourcesTotal: 0,
-  crawlingTermsProcessed: 0,
-  crawlingTermsTotal: 0,
-  crawlingListPagesProcessed: 0,
-  crawlingListPagesTotal: 0,
-  crawlingJobCardsFound: 0,
-  crawlingJobPagesEnqueued: 0,
-  crawlingJobPagesSkipped: 0,
-  crawlingJobPagesProcessed: 0,
-  jobsDiscovered: 0,
-  jobsScored: 0,
-  jobsProcessed: 0,
-  totalToProcess: 0,
-};
-
 const emptyCrawlingStats = {
   crawlingTermsProcessed: 0,
   crawlingTermsTotal: 0,
@@ -168,13 +148,13 @@ function aggregateCrawlingStats(tenantId = getProgressScopeKey()) {
  */
 export function updateProgress(update: Partial<PipelineProgress>): void {
   const tenantId = getProgressScopeKey();
-  currentProgress = { ...getCurrentProgressForTenant(tenantId), ...update };
-  currentProgressByTenant.set(tenantId, currentProgress);
+  const next = { ...getCurrentProgressForTenant(tenantId), ...update };
+  currentProgressByTenant.set(tenantId, next);
 
   // Notify all listeners
   for (const listener of listenersByTenant.get(tenantId) ?? []) {
     try {
-      listener(currentProgress);
+      listener(next);
     } catch (error) {
       logger.error("Error in progress listener", error);
     }
@@ -212,8 +192,7 @@ export function subscribeToProgress(listener: ProgressListener): () => void {
 export function resetProgress(): void {
   const tenantId = getProgressScopeKey();
   currentSourceStatsByTenant.set(tenantId, new Map());
-  currentProgress = createIdleProgress();
-  currentProgressByTenant.set(tenantId, currentProgress);
+  currentProgressByTenant.set(tenantId, createIdleProgress());
 }
 
 /**

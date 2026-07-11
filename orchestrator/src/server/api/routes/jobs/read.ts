@@ -185,7 +185,7 @@ jobsReadRouter.get("/:id/pdf", async (req: Request, res: Response) => {
   const pdfPath = getPdfPath(req.params.id);
   res.setHeader("Cache-Control", "no-store");
   res.sendFile(pdfPath, (error) => {
-    if (error) {
+    if (error && !res.headersSent) {
       fail(res, notFound("PDF not found"));
     }
   });

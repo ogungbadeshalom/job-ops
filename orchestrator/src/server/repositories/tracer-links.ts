@@ -8,8 +8,8 @@ import {
 } from "../tenancy/private-scope";
 
 const { jobs, tracerClickEvents, tracerLinks } = schema;
-const TRACE_CODE_ALPHABET = "abcdefghijklmnopqrstuvwxyz";
-const TRACE_CODE_LENGTH = 2;
+const TRACE_CODE_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+const TRACE_CODE_LENGTH = 8;
 const MAX_TOKEN_GENERATION_ATTEMPTS = 800;
 
 type AnalyticsFilterArgs = {
@@ -62,11 +62,12 @@ function normalizeSlugPrefix(value: string): string {
 }
 
 function randomTraceCode(): string {
-  const first =
-    TRACE_CODE_ALPHABET[Math.floor(Math.random() * TRACE_CODE_ALPHABET.length)];
-  const second =
-    TRACE_CODE_ALPHABET[Math.floor(Math.random() * TRACE_CODE_ALPHABET.length)];
-  return `${first}${second}`.slice(0, TRACE_CODE_LENGTH);
+  let code = "";
+  for (let i = 0; i < TRACE_CODE_LENGTH; i++) {
+    code +=
+      TRACE_CODE_ALPHABET[Math.floor(Math.random() * TRACE_CODE_ALPHABET.length)];
+  }
+  return code;
 }
 
 function isUniqueConstraintError(error: unknown): boolean {

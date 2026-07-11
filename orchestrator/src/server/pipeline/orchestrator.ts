@@ -210,25 +210,42 @@ export async function recoverStalePipelineRuns(): Promise<void> {
 
   if (staleRows.length === 0) return;
 
-  logger.warn("Recovering stale pipeline runs", {
-    count: staleRows.length,
-    runIds: staleRows.map((row) => row.id),
-  });
-
+  // Recover per-tenant so each update runs with the correct request context
+  // (tenantId) for logging/auditing, instead of a single cross-tenant bulk
+  // update with no context.
   const now = new Date().toISOString();
-  await db
-    .update(pipelineRuns)
-    .set({
-      status: "failed",
-      completedAt: now,
-      errorMessage: "Recovered from stale lock on server startup",
-    })
-    .where(
-      and(
-        eq(pipelineRuns.status, "running"),
-        lt(pipelineRuns.startedAt, cutoff),
-      ),
-    );
+  const byTenant = new Map<string, string[]>();
+  for (const row of staleRows) {
+    const tenantId = row.tenantId ?? "tenant_default";
+    const ids = byTenant.get(tenantId) ?? [];
+    ids.push(row.id);
+    byTenant.set(tenantId, ids);
+  }
+
+  for (const [tenantId, runIds] of byTenant) {
+    await runWithRequestContext({ tenantId, requestId: "startup-recovery" }, async () => {
+      logger.warn("Recovering stale pipeline runs for tenant", {
+        tenantId,
+        count: runIds.length,
+        runIds,
+      });
+
+      await db
+        .update(pipelineRuns)
+        .set({
+          status: "failed",
+          completedAt: now,
+          errorMessage: "Recovered from stale lock on server startup",
+        })
+        .where(
+          and(
+            eq(pipelineRuns.tenantId, tenantId),
+            eq(pipelineRuns.status, "running"),
+            lt(pipelineRuns.startedAt, cutoff),
+          ),
+        );
+    });
+  }
 }
 
 // ---------- Challenge pause/resume state ----------

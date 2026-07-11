@@ -79,6 +79,7 @@ function getWatchlistSourcesPayload(
 watchlistRouter.get(
   "/states",
   asyncRoute(async (_req: Request, res: Response) => {
+    requireNonClientRole();
     ok(res, { states: await watchlistRepo.listWatchlistJobStates() });
   }),
 );
@@ -86,6 +87,7 @@ watchlistRouter.get(
 watchlistRouter.get(
   "/sources",
   asyncRoute(async (_req: Request, res: Response) => {
+    requireNonClientRole();
     const [catalogSources, selectedSources] = await Promise.all([
       listCareerBoardSources(),
       watchlistRepo.listWatchlistSelectedSources(),
@@ -98,6 +100,7 @@ watchlistRouter.get(
 watchlistRouter.post(
   "/results",
   asyncRoute(async (_req: Request, res: Response) => {
+    requireNonClientRole();
     ok(
       res,
       (await getCurrentWatchlistResults()) satisfies WatchlistResultsResponse,
@@ -108,6 +111,7 @@ watchlistRouter.post(
 watchlistRouter.post(
   "/job-details",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const parsedBody = watchlistSourceJobSchema.safeParse(req.body ?? {});
     if (!parsedBody.success) {
       return fail(
@@ -151,6 +155,7 @@ watchlistRouter.post(
 watchlistRouter.post(
   "/import-draft",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const parsedBody = watchlistSourceJobSchema.safeParse(req.body ?? {});
     if (!parsedBody.success) {
       return fail(
@@ -198,6 +203,7 @@ watchlistRouter.post(
 watchlistRouter.post(
   "/source-branding",
   asyncRoute(async (req: Request, res: Response) => {
+    requireNonClientRole();
     const parsedBody = watchlistSourceBrandingSchema.safeParse(req.body ?? {});
     if (!parsedBody.success) {
       return fail(

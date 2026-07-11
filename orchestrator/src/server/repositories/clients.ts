@@ -235,7 +235,7 @@ export async function deleteClient(id: string): Promise<boolean> {
   // Log a warn and continue so deleteClient still reports success.
   if (clientUserId) {
     try {
-      await revokeAuthSessionsForUser(clientUserId);
+      await revokeAuthSessionsForUser(clientUserId, tenantId);
     } catch (err) {
       logger.warn("Failed to revoke auth sessions for deleted client user", {
         clientId: id,

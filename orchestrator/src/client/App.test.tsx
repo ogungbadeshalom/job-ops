@@ -26,10 +26,6 @@ vi.mock("./pages/HomePage", () => ({
   HomePage: () => <div>overview</div>,
 }));
 
-vi.mock("./pages/InProgressBoardPage", () => ({
-  InProgressBoardPage: () => null,
-}));
-
 vi.mock("./pages/JobPage", () => ({
   JobPage: () => null,
 }));
