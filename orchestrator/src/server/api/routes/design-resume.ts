@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { badRequest, conflict, notFound, toAppError } from "@infra/errors";
 import { asyncRoute, fail, ok } from "@infra/http";
 import { logger } from "@infra/logger";
@@ -468,6 +469,15 @@ designResumeRouter.get(
     // Master resume PDF is agency-internal; clients must not download it. (Audit HIGH #4)
     requireNonClientRole();
     const pdfPath = getTenantDesignResumePdfPath();
+    try {
+      if (statSync(pdfPath).size === 0) {
+        fail(res, notFound("Resume Studio PDF not found"));
+        return;
+      }
+    } catch {
+      fail(res, notFound("Resume Studio PDF not found"));
+      return;
+    }
     res.setHeader("Cache-Control", "no-store");
     res.sendFile(pdfPath, (error) => {
       if (error && !res.headersSent) {

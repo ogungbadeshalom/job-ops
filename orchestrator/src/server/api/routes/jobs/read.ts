@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { badRequest, notFound } from "@infra/errors";
 import { fail, ok } from "@infra/http";
 import { logger } from "@infra/logger";
@@ -183,6 +184,13 @@ jobsReadRouter.get("/:id/pdf", async (req: Request, res: Response) => {
   }
 
   const pdfPath = getPdfPath(req.params.id);
+  // Reject a 0-byte file (a truncated/aborted render or an in-progress
+  // regeneration) so the client gets a clear 404 instead of an empty download.
+  if (statSync(pdfPath).size === 0) {
+    fail(res, notFound("PDF not found"));
+    return;
+  }
+
   res.setHeader("Cache-Control", "no-store");
   res.sendFile(pdfPath, (error) => {
     if (error && !res.headersSent) {

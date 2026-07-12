@@ -55,6 +55,11 @@ export const MyJobDetailPage: React.FC = () => {
       });
       if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
+      if (blob.size === 0) {
+        throw new Error(
+          "The file came back empty. It may still be generating — try again in a moment.",
+        );
+      }
       const blobUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = blobUrl;

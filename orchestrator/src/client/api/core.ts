@@ -404,7 +404,15 @@ export async function fetchBlobApi(
       throw toApiError(response, parsed);
     }
 
-    return response.blob();
+    const blob = await response.blob();
+    // A 200 with an empty body (e.g. a file truncated mid-write or a sendFile
+    // race) would otherwise download as a 0-byte file. Surface a real error.
+    if (blob.size === 0) {
+      throw new Error(
+        "The file came back empty. It may still be generating — try again in a moment.",
+      );
+    }
+    return blob;
   }
 }
 
