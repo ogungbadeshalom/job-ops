@@ -430,6 +430,7 @@ export async function runPipeline(
     minSuitabilityScore: mergedConfig.minSuitabilityScore,
     sources: mergedConfig.sources,
     locationIntent,
+    postedWithinHours: mergedConfig.postedWithinHours ?? null,
   } as const;
 
   let savedDetails: PipelineRunSavedDetails | null = null;

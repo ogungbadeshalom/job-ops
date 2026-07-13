@@ -42,6 +42,80 @@ type DiscoverySourceTask = {
   run: () => Promise<DiscoveryTaskResult>;
 };
 
+/**
+ * Race a discovery source task against the pipeline cancel signal.
+ *
+ * asyncPool only checks `shouldStop` between tasks, so a single extractor that
+ * never settles (e.g. JobSpy blocked on a site that doesn't time out quickly)
+ * would block Cancel indefinitely. This wrapper polls the cancel flag and, when
+ * it fires, resolves with an empty result so the pool settles and the pipeline
+ * exits. The underlying extractor promise is left to settle on its own in the
+ * background (its process timeout / cancel wiring still applies).
+ */
+function raceSourceTaskWithCancel<T extends { discoveredJobs: unknown[] }>(
+  task: Promise<T>,
+  shouldCancel?: () => boolean,
+): Promise<T> {
+  if (!shouldCancel) return task;
+
+  return new Promise<T>((resolve) => {
+    let settled = false;
+    const finish = (value: T) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(interval);
+      resolve(value);
+    };
+    const empty = (): T => ({ discoveredJobs: [] } as unknown as T);
+
+    task.then(
+      (result) => finish(result),
+      () => finish(empty()),
+    );
+
+    const interval = setInterval(() => {
+      if (shouldCancel()) {
+        finish(empty());
+      }
+    }, 250);
+  });
+}
+
+const RELATIVE_AGE_UNIT_MS: Record<string, number> = {
+  minute: 60_000,
+  hour: 3_600_000,
+  day: 86_400_000,
+  week: 7 * 86_400_000,
+  month: 30 * 86_400_000,
+  year: 365 * 86_400_000,
+};
+
+/**
+ * Parse a job's `datePosted` into an epoch ms value. Accepts ISO date/datetime
+ * strings and common relative phrases ("3 days ago", "2 hours ago", "today",
+ * "yesterday"). Returns null when the value can't be parsed so callers can
+ * decide to keep the job (don't drop data on an unparseable date).
+ */
+function parseDatePostedMs(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const value = raw.trim();
+  if (!value) return null;
+
+  const iso = Date.parse(value);
+  if (!Number.isNaN(iso)) return iso;
+
+  const lower = value.toLowerCase();
+  if (lower === "today") return Date.now();
+  if (lower === "yesterday") return Date.now() - 86_400_000;
+
+  const match = lower.match(/(\d+)\s*(minute|hour|day|week|month|year)s?\s*(?:ago)?/);
+  if (match) {
+    const unit = RELATIVE_AGE_UNIT_MS[match[2]];
+    if (unit) return Date.now() - Number.parseInt(match[1], 10) * unit;
+  }
+  return null;
+}
+
 function parseBlockedCompanyKeywords(raw: string | undefined): string[] {
   if (!raw) return [];
   try {
@@ -259,6 +333,7 @@ export async function discoverJobsStep(args: {
           settings: filteredSettings,
           searchTerms,
           selectedCountry: getLegacyLocationSelection(locationIntent),
+          postedWithinHours: args.mergedConfig.postedWithinHours ?? null,
           locationIntent,
           sourceLocationPlan: getSourceLocationPlan(
             grouped.sources[0] as CrawlSource,
@@ -404,7 +479,15 @@ export async function discoverJobsStep(args: {
         },
         task: async (sourceTask) => {
           try {
-            return await sourceTask.run();
+            // Race the extractor against cancellation. Without this, a hung
+            // extractor (e.g. JobSpy waiting on a blocked site) blocks the whole
+            // pool and Cancel does nothing until every task's own timeout fires.
+            // On cancel we stop awaiting — the underlying extractor process is
+            // left to clean itself up — and return an empty result so the pool
+            // settles and the pipeline exits promptly.
+            return await raceSourceTaskWithCancel(sourceTask.run(), () =>
+              args.shouldCancel?.() === true,
+            );
           } catch (error) {
             logger.warn("Discovery source task failed", {
               sourceTask: sourceTask.source,
@@ -439,6 +522,31 @@ export async function discoverJobsStep(args: {
       if (args.mergedConfig.clientId) {
         for (const job of discoveredJobs) {
           job.clientId = args.mergedConfig.clientId;
+        }
+      }
+
+      // Safety-net date filter: drop jobs older than the "posted within"
+      // window based on their datePosted. JobSpy already pre-filters via
+      // hoursOld, but other extractors don't, so enforce it here too. Jobs
+      // with no parseable datePosted are kept (don't lose data because a
+      // source omitted the date); the view-side filter drops them when active.
+      const postedWithinHours = args.mergedConfig.postedWithinHours ?? null;
+      if (postedWithinHours != null && postedWithinHours > 0) {
+        const cutoff = Date.now() - postedWithinHours * 3_600_000;
+        const before = discoveredJobs.length;
+        for (let i = discoveredJobs.length - 1; i >= 0; i -= 1) {
+          const postedMs = parseDatePostedMs(discoveredJobs[i].datePosted);
+          if (postedMs != null && postedMs < cutoff) {
+            discoveredJobs.splice(i, 1);
+          }
+        }
+        if (discoveredJobs.length < before) {
+          logger.info("Filtered discovered jobs by posted-within window", {
+            step: "discover-jobs",
+            postedWithinHours,
+            removed: before - discoveredJobs.length,
+            kept: discoveredJobs.length,
+          });
         }
       }
 

@@ -213,6 +213,8 @@ const pipelineSearchPresetConfigSchema = z.object({
   topN: z.number().int().min(1).max(200),
   minSuitabilityScore: z.number().int().min(0).max(100),
   runBudget: z.number().int().min(50).max(1000),
+  // Only discover jobs posted within the last N hours. Omitted/null = no limit.
+  postedWithinHours: z.number().int().min(1).max(24 * 90).nullable().optional(),
   scoringInstructions: z.string().trim().max(4000).optional().default(""),
   automaticPresetId: z
     .enum(["fast", "balanced", "detailed", "custom"])
@@ -418,6 +420,8 @@ const runPipelineSchema = z.object({
   minSuitabilityScore: z.number().min(0).max(100).optional(),
   sources: z.array(pipelineSourceSchema).min(1).optional(),
   runBudget: z.number().min(50).max(1000).optional(),
+  // Only discover jobs posted within the last N hours. Omitted/null = no limit.
+  postedWithinHours: z.number().int().min(1).max(24 * 90).nullable().optional(),
   searchTerms: z.array(z.string().trim().min(1)).optional(),
   scoringInstructions: z.string().trim().max(4000).optional(),
   country: z.string().trim().optional(),

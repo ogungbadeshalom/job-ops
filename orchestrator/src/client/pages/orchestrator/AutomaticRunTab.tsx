@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDetectedCountryKey } from "@/lib/user-location";
 import { cn } from "@/lib/utils";
 import { AutomaticRankingPreferencesCard } from "./AutomaticRankingPreferencesCard";
+import { AutomaticPostedWithinCard } from "./AutomaticPostedWithinCard";
 import { AutomaticRunFooter } from "./AutomaticRunFooter";
 import { AutomaticRunSettingsCard } from "./AutomaticRunSettingsCard";
 import { AutomaticSavedSearchControls } from "./AutomaticSavedSearchControls";
@@ -89,6 +90,7 @@ const DEFAULT_VALUES: AutomaticRunValues = {
   searchTerms: ["web developer"],
   scoringInstructions: "",
   runBudget: 200,
+  postedWithinHours: null,
   country: "",
   cityLocations: [],
   workplaceTypes: ["remote", "hybrid", "onsite"],
@@ -100,6 +102,7 @@ interface AutomaticRunFormValues {
   topN: string;
   minSuitabilityScore: string;
   runBudget: string;
+  postedWithinHours: string;
   country: string;
   cityLocations: string[];
   cityLocationDraft: string;
@@ -184,6 +187,7 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
       topN: String(DEFAULT_VALUES.topN),
       minSuitabilityScore: String(DEFAULT_VALUES.minSuitabilityScore),
       runBudget: String(DEFAULT_VALUES.runBudget),
+      postedWithinHours: "",
       country: DEFAULT_VALUES.country,
       cityLocations: [],
       cityLocationDraft: "",
@@ -199,6 +203,7 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
   const topNInput = watch("topN");
   const minScoreInput = watch("minSuitabilityScore");
   const runBudgetInput = watch("runBudget");
+  const postedWithinHoursInput = watch("postedWithinHours");
   const countryInput = watch("country");
   const cityLocations = watch("cityLocations");
   const cityLocationDraft = watch("cityLocationDraft");
@@ -332,6 +337,10 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
         MAX_RUN_BUDGET,
         DEFAULT_VALUES.runBudget,
       ),
+      postedWithinHours: postedWithinHoursInput
+        ? Math.min(24 * 90, Math.max(1, Number(postedWithinHoursInput) || 0)) ||
+          null
+        : null,
       country: normalizedCountry || DEFAULT_VALUES.country,
       cityLocations,
       workplaceTypes: normalizeWorkplaceTypes(workplaceTypes),
@@ -344,6 +353,7 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
     topNInput,
     minScoreInput,
     runBudgetInput,
+    postedWithinHoursInput,
     countryInput,
     cityLocations,
     workplaceTypes,
@@ -506,6 +516,7 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
       topN: values.topN,
       minSuitabilityScore: values.minSuitabilityScore,
       runBudget: values.runBudget,
+      postedWithinHours: values.postedWithinHours,
       scoringInstructions: values.scoringInstructions,
       automaticPresetId: selectedPreset,
       watchlistSelectedSourceIds: [...selectedWatchlistSourceIds],
@@ -580,6 +591,11 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
       shouldDirty: true,
     });
     setValue("runBudget", String(config.runBudget), { shouldDirty: true });
+    setValue(
+      "postedWithinHours",
+      config.postedWithinHours ? String(config.postedWithinHours) : "",
+      { shouldDirty: true },
+    );
     setValue("country", normalizeUiCountryKey(config.country), {
       shouldDirty: true,
     });
@@ -857,6 +873,14 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
               onScoringInstructionsChange={(value) =>
                 setValue("scoringInstructions", value, { shouldDirty: true })
               }
+            />
+
+            <AutomaticPostedWithinCard
+              postedWithinHours={postedWithinHoursInput}
+              onPostedWithinHoursChange={(value) => {
+                setSelectedPreset("custom");
+                setValue("postedWithinHours", value, { shouldDirty: true });
+              }}
             />
 
             <AutomaticSearchTermsCard

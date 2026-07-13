@@ -134,6 +134,7 @@ export async function runPipeline(config?: {
   minSuitabilityScore?: number;
   sources?: JobSource[];
   runBudget?: number;
+  postedWithinHours?: number | null;
   searchTerms?: string[];
   scoringInstructions?: string;
   country?: string;

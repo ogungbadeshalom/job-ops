@@ -105,6 +105,7 @@ export function usePipelineControls(
       minSuitabilityScore: number;
       sources: JobSource[];
       runBudget: number;
+      postedWithinHours: number | null;
       searchTerms: string[];
       scoringInstructions: string;
       country: string;
@@ -122,6 +123,7 @@ export function usePipelineControls(
           minSuitabilityScore: config.minSuitabilityScore,
           sources: config.sources,
           runBudget: config.runBudget,
+          postedWithinHours: config.postedWithinHours,
           searchTerms: config.searchTerms,
           scoringInstructions: config.scoringInstructions,
           country: config.country,

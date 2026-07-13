@@ -168,6 +168,13 @@ export interface RunJobSpyOptions {
   linkedinFetchDescription?: boolean;
   isRemote?: boolean;
   onProgress?: (event: JobSpyProgressEvent) => void;
+  /**
+   * Cooperative cancellation. When this returns true, the in-flight Python
+   * child is killed (SIGTERM→SIGKILL) and the run aborts promptly so the
+   * pipeline's cancel button actually interrupts discovery instead of
+   * waiting for every search term's 90s timeout to expire.
+   */
+  shouldCancel?: () => boolean;
 }
 
 export interface JobSpyResult {
@@ -263,6 +270,9 @@ export async function runJobSpy(
 
     for (const searchTerm of searchTerms) {
       for (const location of runLocations) {
+        if (options.shouldCancel?.()) {
+          return { success: true, jobs, sourceErrors };
+        }
         runIndex += 1;
         const locationToken = location ?? countryIndeed ?? "anywhere";
         const suffix = `${runIndex}_${slugForFilename(searchTerm)}_${slugForFilename(locationToken)}`;
@@ -366,6 +376,19 @@ export async function runJobSpy(
               }
             }, JOBSPY_PROCESS_TIMEOUT_MS);
 
+            // Cooperative cancel: if the pipeline requests cancellation while
+            // this term's subprocess is running, kill it immediately so the
+            // cancel button works instead of waiting up to JOBSPY_PROCESS_TIMEOUT_MS.
+            const cancelHandle = setInterval(() => {
+              if (options.shouldCancel?.()) {
+                try {
+                  child.kill("SIGTERM");
+                } catch {
+                  // already dead
+                }
+              }
+            }, 500);
+
             const handleLine = (line: string, stream: NodeJS.WriteStream) => {
               const event = parseJobSpyProgressLine(line);
               if (event) {
@@ -392,16 +415,33 @@ export async function runJobSpy(
 
             child.on("close", (code) => {
               clearTimeout(timeoutHandle);
+              clearInterval(cancelHandle);
               stdoutRl?.close();
               stderrRl?.close();
+              if (options.shouldCancel?.()) {
+                // Treat a cancel-induced exit as a clean stop, not an error.
+                resolve();
+                return;
+              }
               if (code === 0) resolve();
               else reject(new Error(`JobSpy exited with code ${code}`));
             });
             child.on("error", (err) => {
               clearTimeout(timeoutHandle);
+              clearInterval(cancelHandle);
               reject(err);
             });
           });
+
+          // If the subprocess was cancelled, stop without trying to parse a
+          // partial/missing output file.
+          if (options.shouldCancel?.()) {
+            try {
+              await unlink(outputJson);
+              await unlink(outputCsv);
+            } catch {}
+            return { success: true, jobs, sourceErrors };
+          }
 
           const raw = await readFile(outputJson, "utf-8");
           const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;

@@ -136,9 +136,7 @@ export const employmentTypeValues: EmploymentType[] = employmentTypeOptions.map(
 /** Presets for the "posted within the last N days" filter. */
 export const postedWithinOptions: Array<{ value: number; label: string }> = [
   { value: 1, label: "24 hours" },
-  { value: 3, label: "3 days" },
   { value: 7, label: "7 days" },
-  { value: 14, label: "14 days" },
   { value: 30, label: "30 days" },
 ];
 

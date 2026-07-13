@@ -27,6 +27,8 @@ export interface AutomaticRunValues {
   searchTerms: string[];
   scoringInstructions: string;
   runBudget: number;
+  // Only discover jobs posted within the last N hours. null = no limit.
+  postedWithinHours: number | null;
   country: string;
   cityLocations: string[];
   workplaceTypes: WorkplaceType[];

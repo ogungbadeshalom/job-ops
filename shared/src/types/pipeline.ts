@@ -28,6 +28,10 @@ export interface PipelineConfig {
   // When set, discovered jobs are tagged with this client ID
   // and the client's search terms override the worker's own terms.
   clientId?: string | null;
+  // Only discover jobs posted within the last N hours. null/undefined = no
+  // limit. JobSpy maps this to its `hoursOld` param; other extractors are
+  // filtered by `datePosted` after scraping as a safety net.
+  postedWithinHours?: number | null;
 }
 
 export interface PipelineRunConfigSnapshot {
@@ -35,6 +39,7 @@ export interface PipelineRunConfigSnapshot {
   minSuitabilityScore: number;
   sources: ExtractorSourceId[];
   locationIntent: LocationIntent;
+  postedWithinHours?: number | null;
 }
 
 export interface PipelineRun {
@@ -153,6 +158,8 @@ export interface PipelineSearchPresetConfig {
   topN: number;
   minSuitabilityScore: number;
   runBudget: number;
+  // Only discover jobs posted within the last N hours. null/omitted = no limit.
+  postedWithinHours?: number | null;
   scoringInstructions?: string;
   automaticPresetId?: PipelineSearchPresetMode;
   // Optional per-run Watchlist source selection. Omitted = legacy behavior

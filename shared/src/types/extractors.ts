@@ -39,6 +39,11 @@ export interface ExtractorRuntimeContext {
   getExistingJobUrls?: () => Promise<string[]>;
   shouldCancel?: () => boolean;
   onProgress?: (event: ExtractorProgressEvent) => void;
+  /** Only discover jobs posted within the last N hours. null/undefined = no
+   *  limit. Extractors that support a server-side age filter (e.g. JobSpy's
+   *  hoursOld) should honor this; the pipeline also filters by datePosted as a
+   *  safety net for every extractor. */
+  postedWithinHours?: number | null;
 }
 
 export interface ExtractorRunResult {
