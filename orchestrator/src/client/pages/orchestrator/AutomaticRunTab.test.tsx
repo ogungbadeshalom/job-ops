@@ -37,14 +37,16 @@ vi.mock("@/components/ui/select", () => ({
     onValueChange,
     disabled,
     children,
+    "aria-label": ariaLabel,
   }: {
     value: string;
     onValueChange: (value: string) => void;
     disabled?: boolean;
     children: React.ReactNode;
+    "aria-label"?: string;
   }) => (
     <select
-      aria-label="Saved searches"
+      aria-label={ariaLabel ?? "Saved searches"}
       disabled={disabled}
       value={value}
       onChange={(event) => onValueChange(event.currentTarget.value)}
