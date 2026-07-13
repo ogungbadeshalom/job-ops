@@ -31,3 +31,6 @@ tmp/
 
 # Runtime storage artifacts
 orchestrator/storage
+
+# Stray local worktree (copilot) — never commit
+JOB OPS REWORK.worktrees/
