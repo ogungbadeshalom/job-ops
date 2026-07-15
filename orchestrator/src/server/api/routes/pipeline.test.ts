@@ -652,6 +652,7 @@ describe.sequential("Pipeline API routes", () => {
         topN: 5,
         minSuitabilityScore: 65,
         runBudget: 150,
+        postedWithinHours: 24,
         searchTerms: ["backend engineer"],
         scoringInstructions: "Prefer backend API roles above GBP 60k.",
         country: "united kingdom",
@@ -669,6 +670,7 @@ describe.sequential("Pipeline API routes", () => {
         topN: 5,
         minSuitabilityScore: 65,
         sources: ["gradcracker"],
+        postedWithinHours: 24,
         scoringInstructions: "Prefer backend API roles above GBP 60k.",
         locationIntent: expect.objectContaining({
           selectedCountry: "united kingdom",

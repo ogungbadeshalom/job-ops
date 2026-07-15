@@ -657,6 +657,7 @@ pipelineRouter.post(
             locationIntent,
             watchlistSelectedSourceIds: config.watchlistSelectedSourceIds,
             clientId: config.clientId ?? undefined,
+            postedWithinHours: config.postedWithinHours ?? undefined,
           },
           {
             hostedUsageReservationId: pipelineUsage.reservation?.id ?? null,

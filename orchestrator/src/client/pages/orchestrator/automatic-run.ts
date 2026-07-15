@@ -146,6 +146,8 @@ export interface AutomaticRunMemory {
   minSuitabilityScore: number;
   presetId?: AutomaticPresetSelection;
   runBudget?: number;
+  /** Last-used "posted within" window in hours. Omitted/null = no limit. */
+  postedWithinHours?: number | null;
 }
 
 export function normalizeWorkplaceTypes(
@@ -440,6 +442,14 @@ export function loadAutomaticRunMemory(): AutomaticRunMemory | null {
       typeof parsed.runBudget === "number"
         ? Math.max(50, Math.round(parsed.runBudget))
         : undefined;
+    const rawPostedWithinHours = parsed.postedWithinHours;
+    const postedWithinHours =
+      typeof rawPostedWithinHours === "number" &&
+      Number.isFinite(rawPostedWithinHours) &&
+      rawPostedWithinHours >= 1 &&
+      rawPostedWithinHours <= 24 * 90
+        ? Math.round(rawPostedWithinHours)
+        : null;
     const explicitPresetId = isAutomaticPresetSelection(parsed.presetId)
       ? parsed.presetId
       : null;
@@ -460,6 +470,7 @@ export function loadAutomaticRunMemory(): AutomaticRunMemory | null {
         topN,
         minSuitabilityScore,
         ...(runBudget !== undefined ? { runBudget } : {}),
+        ...(postedWithinHours != null ? { postedWithinHours } : {}),
         presetId: "custom",
       };
     }
@@ -484,6 +495,7 @@ export function loadAutomaticRunMemory(): AutomaticRunMemory | null {
       topN,
       minSuitabilityScore,
       ...(runBudget !== undefined ? { runBudget } : {}),
+      ...(postedWithinHours != null ? { postedWithinHours } : {}),
       presetId: "custom",
     };
   } catch {

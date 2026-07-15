@@ -271,6 +271,10 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
     const rememberedMatchStrictness =
       settings?.locationMatchStrictness?.value ??
       DEFAULT_VALUES.matchStrictness;
+    const rememberedPostedWithinHours =
+      memory?.postedWithinHours != null
+        ? String(memory.postedWithinHours)
+        : "";
 
     setBrowserCountrySuggestion(suggestion);
     reset({
@@ -286,6 +290,7 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
       searchTerms: settings?.searchTerms?.value ?? DEFAULT_VALUES.searchTerms,
       searchTermDraft: "",
       scoringInstructions: DEFAULT_VALUES.scoringInstructions,
+      postedWithinHours: rememberedPostedWithinHours,
     });
     setSelectedPreset(memory?.presetId ?? "custom");
     setAdvancedOpen(false);
@@ -572,6 +577,7 @@ export const AutomaticRunTab: React.FC<AutomaticRunTabProps> = ({
         minSuitabilityScore: values.minSuitabilityScore,
         runBudget: values.runBudget,
         presetId: selectedPreset,
+        postedWithinHours: values.postedWithinHours,
       });
       await onSaveAndRun({
         ...values,
