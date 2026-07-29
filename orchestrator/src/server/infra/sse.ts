@@ -23,12 +23,27 @@ export function setupSse(res: Response, options: SetupSseOptions = {}): void {
   }
 }
 
-export function writeSseData(res: Response, data: unknown): void {
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
+export function writeSseData(res: Response, data: unknown): boolean {
+  // Backpressure-safe + error-guarded SSE write. A slow/disconnected client can
+  // make res.write() return false (internal buffer full) or throw (socket
+  // already closed). Ignoring that previously grew the server buffer unbounded
+  // and could throw uncaught, killing the SSE stream. Callers should stop
+  // writing to a response once this returns false.
+  if (res.writableEnded || res.destroyed) return false;
+  try {
+    return res.write(`data: ${JSON.stringify(data)}\n\n`);
+  } catch {
+    return false;
+  }
 }
 
-export function writeSseComment(res: Response, comment: string): void {
-  res.write(`: ${comment}\n\n`);
+export function writeSseComment(res: Response, comment: string): boolean {
+  if (res.writableEnded || res.destroyed) return false;
+  try {
+    return res.write(`: ${comment}\n\n`);
+  } catch {
+    return false;
+  }
 }
 
 export function startSseHeartbeat(

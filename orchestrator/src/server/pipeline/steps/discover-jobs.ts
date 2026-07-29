@@ -43,14 +43,31 @@ type DiscoverySourceTask = {
 };
 
 /**
- * Race a discovery source task against the pipeline cancel signal.
+ * Hard cap on how long a single discovery source task may run before we give up
+ * on it. Most extractors have their own timeouts (JobSpy: 90s process kill), but
+ * some have none, so without this a hung extractor blocks its asyncPool slot
+ * indefinitely — pinning discovery at ~5% and making Cancel ineffective. The
+ * default is generous (120s) and configurable. The underlying promise is still
+ * left to settle on its own; we just stop waiting.
+ */
+const DISCOVERY_SOURCE_TIMEOUT_MS = Math.max(
+  10_000,
+  Number.parseInt(process.env.DISCOVERY_SOURCE_TIMEOUT_MS ?? "", 10) || 120_000,
+);
+
+/**
+ * Race a discovery source task against the pipeline cancel signal AND a hard
+ * per-source timeout.
  *
  * asyncPool only checks `shouldStop` between tasks, so a single extractor that
- * never settles (e.g. JobSpy blocked on a site that doesn't time out quickly)
- * would block Cancel indefinitely. This wrapper polls the cancel flag and, when
- * it fires, resolves with an empty result so the pool settles and the pipeline
- * exits. The underlying extractor promise is left to settle on its own in the
- * background (its process timeout / cancel wiring still applies).
+ * never settles (e.g. JobSpy blocked on a site that doesn't time out quickly,
+ * or a non-JobSpy extractor with no internal timeout) would block Cancel
+ * indefinitely. This wrapper polls the cancel flag and, when it fires, resolves
+ * with an empty result so the pool settles and the pipeline exits. It also
+ * enforces DISCOVERY_SOURCE_TIMEOUT_MS so no extractor can hang forever even
+ * when cancel isn't requested. The underlying extractor promise is left to
+ * settle on its own in the background (its process timeout / cancel wiring
+ * still applies).
  */
 function raceSourceTaskWithCancel<T extends { discoveredJobs: unknown[] }>(
   task: Promise<T>,
@@ -64,6 +81,7 @@ function raceSourceTaskWithCancel<T extends { discoveredJobs: unknown[] }>(
       if (settled) return;
       settled = true;
       clearInterval(interval);
+      if (timeout) clearTimeout(timeout);
       resolve(value);
     };
     const empty = (): T => ({ discoveredJobs: [] } as unknown as T);
@@ -78,6 +96,10 @@ function raceSourceTaskWithCancel<T extends { discoveredJobs: unknown[] }>(
         finish(empty());
       }
     }, 250);
+
+    const timeout = setTimeout(() => {
+      finish(empty());
+    }, DISCOVERY_SOURCE_TIMEOUT_MS);
   });
 }
 

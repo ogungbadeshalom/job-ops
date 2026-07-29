@@ -151,7 +151,11 @@ export function updateProgress(update: Partial<PipelineProgress>): void {
   const next = { ...getCurrentProgressForTenant(tenantId), ...update };
   currentProgressByTenant.set(tenantId, next);
 
-  // Notify all listeners
+  // Notify all listeners. (Rendering is throttled on the client via
+  // requestAnimationFrame coalescing in PipelineProgress, and the SSE read loop
+  // yields between chunks — those are where the render storm was fixed. The
+  // server deliberately emits every update so no intermediate detail — e.g. a
+  // Cloudflare-challenge message — is lost.)
   for (const listener of listenersByTenant.get(tenantId) ?? []) {
     try {
       listener(next);

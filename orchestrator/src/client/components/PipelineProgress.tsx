@@ -208,9 +208,6 @@ export const PipelineProgress: React.FC<PipelineProgressProps> = ({
         const snapshot = await getPipelineProgressSnapshot();
         if (!isActive) return;
         setProgress(snapshot);
-        if (isPolling) {
-          setTransport("polling");
-        }
         if (TERMINAL_STEPS.has(snapshot.step)) {
           stopPolling();
         }

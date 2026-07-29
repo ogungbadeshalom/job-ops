@@ -100,12 +100,20 @@ export function subscribeToEventSource<T>(
             }
             buffer += decoder.decode(value, { stream: true });
 
+            // Process all frames in this chunk, then YIELD to the event loop
+            // before reading the next chunk. Without the yield, a burst of
+            // frames runs every onMessage handler back-to-back across many
+            // consecutive reads and pins the main thread — under the
+            // high-frequency crawlingUpdate flood during discovery this starves
+            // input/paint and makes Cancel/Sign-Out clicks never fire.
             let parsedFrame = readNextFrame(buffer);
             while (parsedFrame) {
               emitParsedFrame(parsedFrame.frame, handlers);
               buffer = parsedFrame.remainder;
+              if (isClosed) break;
               parsedFrame = readNextFrame(buffer);
             }
+            await new Promise((resolve) => setTimeout(resolve, 0));
           }
 
           const trailingFrame = buffer.trim();

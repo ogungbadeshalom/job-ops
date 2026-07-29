@@ -88,6 +88,21 @@ const DEFAULT_CONFIG: PipelineConfig = {
 
 const MAX_PIPELINE_DURATION_MS = 30 * 60 * 1000;
 
+/**
+ * Hard wall-clock watchdog for a stuck pipeline run. Unlike
+ * MAX_PIPELINE_DURATION_MS (which only fires when `shouldCancel` is polled and
+ * therefore can't interrupt a hung extractor that never returns), this is a
+ * real setTimeout that fires regardless of what the run is doing. If the run
+ * hasn't cleared its state by the cap, the watchdog force-fails the DB row,
+ * clears the in-memory lock (so the next run isn't blocked — closes the
+ * AGENTS.md #22 stale-lock gap for the CURRENT run), and emits a terminal
+ * progress event so the UI stops showing ~5%. Default 5 minutes, configurable.
+ */
+const PIPELINE_WATCHDOG_MS = Math.max(
+  60_000,
+  Number.parseInt(process.env.PIPELINE_WATCHDOG_MS ?? "", 10) || 5 * 60 * 1000,
+);
+
 class PipelineTimeoutError extends Error {
   constructor() {
     super("Pipeline exceeded maximum duration of 30 minutes");
@@ -469,6 +484,43 @@ export async function runPipeline(
       locationIntent: mergedConfig.locationIntent,
     });
 
+    // Arm the hung-run watchdog. If the run hasn't completed by the cap, force
+    // it into failed, clear the in-memory lock, and emit a terminal progress
+    // event — independent of the (possibly blocked) runPipeline async body.
+    const watchdogRunId = pipelineRun.id;
+    const watchdogHandle = setTimeout(() => {
+      const current = getPipelineState(scopeKey);
+      // Only act if THIS run is still the active one and still running.
+      if (
+        current.activePipelineRunId !== watchdogRunId ||
+        !current.isRunning
+      ) {
+        return;
+      }
+      const failMessage = `Pipeline watchdog: run exceeded ${PIPELINE_WATCHDOG_MS} ms and was force-failed (possible hung extractor).`;
+      pipelineLogger.error(failMessage);
+      void pipelineRepo
+        .updatePipelineRun(watchdogRunId, {
+          status: "failed",
+          completedAt: new Date().toISOString(),
+          errorMessage: failMessage,
+        })
+        .catch((err) =>
+          pipelineLogger.warn("Watchdog failed to mark run failed", { err }),
+        );
+      current.isRunning = false;
+      current.startedAt = null;
+      current.activePipelineRunId = null;
+      current.cancelRequestedAt = null;
+      current.activeChallengeState = null;
+      current.activeLlmConfigState = null;
+      try {
+        progressHelpers.failed(failMessage);
+      } catch (err) {
+        pipelineLogger.warn("Watchdog progressHelpers.failed threw", { err });
+      }
+    }, PIPELINE_WATCHDOG_MS);
+
     try {
       ensureNotCancelled(scopeKey);
       await persistResultSummary({ stage: "started" });
@@ -737,6 +789,7 @@ export async function runPipeline(
         error: message,
       };
     } finally {
+      clearTimeout(watchdogHandle);
       tenantState.isRunning = false;
       tenantState.startedAt = null;
       tenantState.activePipelineRunId = null;

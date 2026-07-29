@@ -135,6 +135,48 @@ describe("subscribeToEventSource", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  it("yields to the event loop between chunks so input/paint can run (does not pin the main thread)", async () => {
+    // Regression: under the high-frequency crawlingUpdate flood during
+    // discovery, frames arrive across many reader.read() chunks. Previously
+    // the read loop processed every chunk back-to-back without yielding,
+    // saturating the main thread so Cancel/Sign-Out clicks never fired.
+    // The fix yields to the event loop after each chunk.
+    __setAuthTokenForTests("stream-token");
+
+    // 3 chunks, 10 frames each, delivered across separate reads.
+    const chunks = Array.from({ length: 3 }, (_, ci) =>
+      Array.from({ length: 10 }, (_, fi) =>
+        `data: {"step":"crawling","message":"tick ${ci}-${fi}"}\n\n`,
+      ).join(""),
+    );
+
+    let yieldObserved = false;
+    const onMessage = vi.fn((payload: { message?: string }) => {
+      if (payload.message === "tick 0-0") {
+        // Macrotask scheduled during the first chunk's first frame. If the loop
+        // yields between chunks, this runs before chunk 2's frames; if it
+        // processes all 30 frames synchronously, onMessage has 30 calls here.
+        setTimeout(() => {
+          yieldObserved = onMessage.mock.calls.length < 30;
+        }, 0);
+      }
+    });
+
+    vi.spyOn(global, "fetch").mockResolvedValueOnce(createStreamResponse(chunks));
+
+    subscribeToEventSource("/api/pipeline/progress", {
+      onMessage,
+      onError: vi.fn(),
+    });
+
+    await vi.waitFor(() => {
+      expect(onMessage).toHaveBeenCalledTimes(30);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(yieldObserved).toBe(true);
+  });
+
   it("ignores heartbeat comments and parses trailing frames on close", async () => {
     const onOpen = vi.fn();
     const onMessage = vi.fn();
